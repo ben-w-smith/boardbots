@@ -1,0 +1,11 @@
+---
+description: "TypeScript coding standards"
+globs: ["**/*.ts"]
+---
+
+# TypeScript Coding Standards
+
+- **Strict Types**: No `any`, use proper type definitions
+- **Interface Boundaries**: Use interfaces for public APIs
+- **Explicit Returns**: Always declare return types on functions
+- **Null Safety**: Handle null/undefined explicitly

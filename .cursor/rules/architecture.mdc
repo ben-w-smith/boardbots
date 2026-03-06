@@ -1,0 +1,19 @@
+---
+description: "General architecture rules and coding style guidelines for the monorepo"
+globs: ["**/*"]
+---
+
+# BoardBots Architecture & Style Rules
+
+## Monorepo Boundaries
+
+- **Engine (`packages/engine/`)**: MUST remain completely pure. Absolutely zero I/O, network, or environment-specific dependencies (no `fetch`, no DOM, no Cloudflare imports). Only export pure functions, interfaces, and mathematical logic.
+- **Server (`packages/server/`)**: The authoritative game state manager. Depends on `engine` but NEVER on `client`. Handles all Cloudflare Durable Object and WebSocket logic.
+- **Client (`packages/client/`)**: The Vite SPA. Depends on `engine` but NEVER on `server`. Handles purely presentation, canvas rendering, and WebSocket transport.
+
+## Coding Style
+
+- **Separation of Concerns**: Keep networking logic separated from game logic. Transport state should be converted to engine `GameState` as early as possible.
+- **Functional Preference**: Favor pure functions and immutability (especially in the engine) to make testing exact and predictable.
+- **Naming Conventions**: Use descriptive, precise names. Favor verb-noun for functions (e.g., `resolveMove`, `broadcastGameState`).
+- **File Structure**: Keep files small and focused. Export related interfaces in `types.ts` rather than scattering them.

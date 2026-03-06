@@ -1,0 +1,11 @@
+---
+description: "Client package rules for Vite SPA"
+globs: ["packages/client/**/*.ts"]
+---
+
+# Client Package Rules
+
+- **Vite Proxy**: Ensure `/api` proxy is configured in `vite.config.ts`
+- **Canvas Rendering**: Use `requestAnimationFrame` for render loop
+- **Null State**: Handle `state: null` in game messages gracefully
+- **WebSocket Reconnect**: Client has reconnect logic built into `GameSocket`

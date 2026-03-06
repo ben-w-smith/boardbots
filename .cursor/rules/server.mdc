@@ -1,0 +1,11 @@
+---
+description: "Server package rules for Cloudflare Durable Objects"
+globs: ["packages/server/**/*.ts"]
+---
+
+# Server Package Rules
+
+- **Hibernation-Safe**: Always use `this.state.getWebSockets()`, never in-memory Maps for WebSocket tracking
+- **Attachment API**: Use `serializeAttachment`/`deserializeAttachment` for session metadata
+- **Wrangler Dev**: Test with `npx wrangler dev --port 8787` locally
+- **DO Patterns**: Durable Objects can hibernate - plan for state loss

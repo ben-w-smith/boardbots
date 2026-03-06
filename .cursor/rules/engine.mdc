@@ -1,0 +1,12 @@
+---
+description: "Engine package rules for pure game logic"
+globs: ["packages/engine/**/*.ts"]
+---
+
+# Engine Package Rules
+
+- **Pure Functions Only**: No side effects, no external state
+- **Immutability**: Always return new state objects, never mutate inputs
+- **Two-Phase Resolution**: Moving robot's beam stays OFF during resolution via `_activeRobotPosition`
+- **Hex Math**: Use axial coordinates (q, r) with helper functions from `hex.ts`
+- **No Dependencies**: Engine must not import from client or server

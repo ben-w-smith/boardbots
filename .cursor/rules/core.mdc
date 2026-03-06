@@ -1,0 +1,12 @@
+---
+description: "Core development rules that always apply"
+alwaysApply: true
+---
+
+# Core Development Rules
+
+- **TDD Strictness**: Write tests first for new features
+- **Plan First**: Always understand existing code before making changes
+- **No Guesswork**: Read files before editing, never assume content
+- **Run Tests**: After any change, run the relevant test suite
+- **Keep It Simple**: Don't over-engineer, no speculative features
