@@ -1,5 +1,5 @@
 import type { GameState, Pair } from './types.js';
-import { pairS, pairDist, pairEq } from './hex.js';
+import { pairS, pairDist, pairEq, pairKey } from './hex.js';
 import { robotAt, isCorridor } from './game.js';
 
 /**
@@ -24,7 +24,7 @@ export const ATTACK_AXES: Map<string, (attacker: Pair, target: Pair) => boolean>
 
 /** Get the attack axis function for a direction */
 export function getAttackAxis(direction: Pair): ((attacker: Pair, target: Pair) => boolean) | undefined {
-  const key = `${direction.q},${direction.r}`;
+  const key = pairKey(direction);
   return ATTACK_AXES.get(key);
 }
 

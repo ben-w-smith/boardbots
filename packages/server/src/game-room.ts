@@ -307,13 +307,10 @@ export class GameRoom implements DurableObject {
     }
 
     // Validate it's this player's turn
-    if (move.player !== attachment.playerIndex) {
-      this.sendTo(ws, { type: "error", message: "Not your turn" });
-      return;
-    }
-
-    // Validate move.player matches current turn
-    if (move.player !== this.persisted.gameState.playerTurn) {
+    if (
+      move.player !== attachment.playerIndex ||
+      move.player !== this.persisted.gameState.playerTurn
+    ) {
       this.sendTo(ws, { type: "error", message: "Not your turn" });
       return;
     }
@@ -321,23 +318,10 @@ export class GameRoom implements DurableObject {
     try {
       this.persisted.gameState = applyMove(this.persisted.gameState, move);
 
-      // Check for game over
-      const { isOver, winner } = checkGameOver(this.persisted.gameState);
-      if (isOver) {
-        this.persisted.phase = "finished";
-        const winnerName =
-          Array.from(this.persisted.players.values()).find(
-            (p) => p.index === winner,
-          )?.name ?? "Unknown";
-
+      if (!(await this.checkAndHandleGameOver())) {
         await this.saveState();
         this.broadcastGameState();
-        this.broadcast({ type: "gameOver", winner, winnerName });
-        return;
       }
-
-      await this.saveState();
-      this.broadcastGameState();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Invalid move";
       this.sendTo(ws, { type: "error", message: errorMessage });
@@ -374,23 +358,10 @@ export class GameRoom implements DurableObject {
         result.move,
       );
 
-      // Check for game over
-      const { isOver, winner } = checkGameOver(this.persisted.gameState);
-      if (isOver) {
-        this.persisted.phase = "finished";
-        const winnerName =
-          Array.from(this.persisted.players.values()).find(
-            (p) => p.index === winner,
-          )?.name ?? "Unknown";
-
+      if (!(await this.checkAndHandleGameOver())) {
         await this.saveState();
         this.broadcastGameState();
-        this.broadcast({ type: "gameOver", winner, winnerName });
-        return;
       }
-
-      await this.saveState();
-      this.broadcastGameState();
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "AI move failed";
@@ -480,14 +451,14 @@ export class GameRoom implements DurableObject {
     }
   }
 
-  // Broadcast game state to all
-  private broadcastGameState(): void {
+  // Build game state message (shared by broadcastGameState and sendGameState)
+  private buildGameStateMessage(): ServerMessage {
     const playerNames = Array.from(this.persisted.players.values())
       .filter((p) => p.index < 2)
       .sort((a, b) => a.index - b.index)
       .map((p) => p.name);
 
-    const msg: ServerMessage = {
+    return {
       type: "gameState",
       state: this.persisted.gameState
         ? toTransport(this.persisted.gameState)
@@ -495,26 +466,35 @@ export class GameRoom implements DurableObject {
       players: playerNames,
       phase: this.persisted.phase,
     };
+  }
 
-    this.broadcast(msg);
+  // Broadcast game state to all
+  private broadcastGameState(): void {
+    this.broadcast(this.buildGameStateMessage());
+  }
+
+  /** Check for game over and handle if complete. Returns true if game is over. */
+  private async checkAndHandleGameOver(): Promise<boolean> {
+    if (!this.persisted.gameState) return false;
+
+    const { isOver, winner } = checkGameOver(this.persisted.gameState);
+    if (isOver) {
+      this.persisted.phase = "finished";
+      const winnerName =
+        Array.from(this.persisted.players.values()).find(
+          (p) => p.index === winner,
+        )?.name ?? "Unknown";
+
+      await this.saveState();
+      this.broadcastGameState();
+      this.broadcast({ type: "gameOver", winner, winnerName });
+      return true;
+    }
+    return false;
   }
 
   // Send game state to a specific client
   private sendGameState(ws: WebSocket): void {
-    const playerNames = Array.from(this.persisted.players.values())
-      .filter((p) => p.index < 2)
-      .sort((a, b) => a.index - b.index)
-      .map((p) => p.name);
-
-    const msg: ServerMessage = {
-      type: "gameState",
-      state: this.persisted.gameState
-        ? toTransport(this.persisted.gameState)
-        : null,
-      players: playerNames,
-      phase: this.persisted.phase,
-    };
-
-    this.sendTo(ws, msg);
+    this.sendTo(ws, this.buildGameStateMessage());
   }
 }

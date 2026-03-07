@@ -10,7 +10,7 @@ import type {
   TransportRobot,
   TransportRobotEntry,
 } from "./types.js";
-import { pairDist, pairEq, pairKey } from "./hex.js";
+import { pairDist, pairEq, pairKey, pairAdd, pairRotate } from "./hex.js";
 import { resolveMove } from "./resolution.js";
 
 /** Create a new game from a game definition */
@@ -47,9 +47,28 @@ export function isCorridor(state: GameState, pair: Pair): boolean {
   return pairDist(pair) === corridor;
 }
 
-/** Create a deep clone of game state */
+/** Create a deep clone of game state (optimized for AI search) */
 export function cloneState(state: GameState): GameState {
-  return structuredClone(state);
+  // Optimized clone: gameDef is immutable, so we reuse the reference
+  // Only clone the mutable parts: players and robots arrays
+  return {
+    gameDef: state.gameDef, // Reuse immutable reference
+    players: state.players.map(p => ({ ...p })),
+    robots: state.robots.map(r => ({
+      position: { ...r.position },
+      direction: { ...r.direction },
+      isBeamEnabled: r.isBeamEnabled,
+      isLockedDown: r.isLockedDown,
+      player: r.player,
+    })),
+    playerTurn: state.playerTurn,
+    movesThisTurn: state.movesThisTurn,
+    requiresTieBreak: state.requiresTieBreak,
+    winner: state.winner,
+    _activeRobotPosition: state._activeRobotPosition
+      ? { ...state._activeRobotPosition }
+      : undefined,
+  };
 }
 
 /** Execute a move, returns new game state or throws error */
@@ -168,10 +187,7 @@ function executeAdvance(
   }
 
   // Calculate advance position
-  const advanceSpot: Pair = {
-    q: robot.position.q + robot.direction.q,
-    r: robot.position.r + robot.direction.r,
-  };
+  const advanceSpot = pairAdd(robot.position, robot.direction);
 
   // Check for blocking robot
   if (robotAt(state, advanceSpot)) {
@@ -211,12 +227,7 @@ function executeTurn(
   state._activeRobotPosition = { ...robot.position };
 
   // Rotate direction
-  const s = -robot.direction.q - robot.direction.r;
-  if (move.direction === "right") {
-    robot.direction = { q: -robot.direction.r, r: -s };
-  } else {
-    robot.direction = { q: -s, r: -robot.direction.q };
-  }
+  robot.direction = pairRotate(robot.direction, move.direction);
 
   state.movesThisTurn -= 1;
 }

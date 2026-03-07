@@ -8,6 +8,10 @@ export type PlayerPosition = number; // 0-indexed player index
 
 export type TurnDirection = 'left' | 'right';
 
+export type WinCondition = 'Elimination';
+
+export type GamePhase = 'waiting' | 'playing' | 'finished';
+
 export interface BoardType {
   arenaRadius: number;
 }

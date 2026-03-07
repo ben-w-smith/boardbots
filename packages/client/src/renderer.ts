@@ -39,6 +39,14 @@ const DEFAULT_COLORS: ColorScheme = {
   validMove: "rgba(0, 255, 136, 0.3)",
 };
 
+/** Convert a direction Pair to angle in radians (flat-top hex layout) */
+export function directionToAngle(direction: Pair): number {
+  return Math.atan2(
+    Math.sqrt(3) * (direction.r + direction.q * 0.5),
+    direction.q * 1.5,
+  );
+}
+
 export interface Highlight {
   position: Pair;
   type: "selected" | "validMove";
@@ -54,6 +62,7 @@ export class BoardRenderer {
   private centerY: number = 0;
   private arenaRadius: number = 4;
   private animator: Animator | null = null;
+  private cachedHexes: { pos: Pair; isCorridor: boolean }[] | null = null;
 
   constructor(canvas: HTMLCanvasElement, options?: RenderOptions) {
     this.canvas = canvas;
@@ -88,8 +97,9 @@ export class BoardRenderer {
     this.canvas.style.width = `${rect.width}px`;
     this.canvas.style.height = `${rect.height}px`;
 
-    // Scale context for high DPI
-    this.ctx.scale(dpr, dpr);
+    // Reset transform and scale context for high DPI
+    // Using setTransform prevents scale accumulation on multiple resize calls
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     // Calculate center
     this.centerX = rect.width / 2;
@@ -296,14 +306,7 @@ export class BoardRenderer {
     const arrowWidth = radius * 0.5;
 
     // Calculate arrow direction angle (use animated angle if available)
-    // Flat-top hex angle: dx = 1.5 * q, dy = sqrt(3) * (r + q/2)
-    let angle = Math.atan2(
-      Math.sqrt(3) * (robot.direction.r + robot.direction.q * 0.5),
-      robot.direction.q * 1.5,
-    );
-    if (animatedAngle !== null) {
-      angle = animatedAngle;
-    }
+    const angle = animatedAngle ?? directionToAngle(robot.direction);
 
     ctx.save();
     ctx.translate(x, y);
@@ -337,12 +340,8 @@ export class BoardRenderer {
     const startPos = this.hexToPixel(robot.position.q, robot.position.r);
     const ctx = this.ctx;
 
-    // Calculate beam direction
-    // Flat-top hex angle: dx = 1.5 * q, dy = sqrt(3) * (r + q/2)
-    const angle = Math.atan2(
-      Math.sqrt(3) * (robot.direction.r + robot.direction.q * 0.5),
-      robot.direction.q * 1.5,
-    );
+    // Calculate beam direction using shared utility
+    const angle = directionToAngle(robot.direction);
 
     // Beam extends to edge of canvas
     const beamLength = Math.max(this.canvas.width, this.canvas.height);
@@ -407,12 +406,19 @@ export class BoardRenderer {
     }
   }
 
-  /** Get all hex positions within arena and corridor */
+  /** Get all hex positions within arena and corridor (cached) */
   private getAllHexPositions(
     state: GameState,
   ): { pos: Pair; isCorridor: boolean }[] {
-    const hexes: { pos: Pair; isCorridor: boolean }[] = [];
     const arenaRadius = state.gameDef.board.hexaBoard.arenaRadius;
+
+    // Return cached hexes if arena radius hasn't changed
+    if (this.cachedHexes && this.arenaRadius === arenaRadius) {
+      return this.cachedHexes;
+    }
+
+    this.arenaRadius = arenaRadius;
+    const hexes: { pos: Pair; isCorridor: boolean }[] = [];
     const fullRadius = arenaRadius + 1; // Include corridor
 
     for (let q = -fullRadius; q <= fullRadius; q++) {
@@ -427,6 +433,7 @@ export class BoardRenderer {
       }
     }
 
+    this.cachedHexes = hexes;
     return hexes;
   }
 
