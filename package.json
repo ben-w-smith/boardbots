@@ -1,10 +1,13 @@
 {
   "name": "lockitdown",
   "private": true,
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "build": "npm run build --workspaces",
     "test": "npm run test --workspaces --if-present",
-    "dev": "npm run dev --workspace=packages/client"
+    "dev": "npm run dev --workspace=packages/client",
+    "test:e2e": "npm run test --workspace=packages/e2e"
   }
 }
