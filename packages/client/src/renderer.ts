@@ -375,7 +375,20 @@ export class BoardRenderer {
     ctx.stroke();
   }
 
-  /** Draw a robot (circle with direction indicator) */
+  /** Helper to desaturate a color for locked-down state */
+  private desaturateColor(color: string): string {
+    // For hex colors like "#00D4FF"
+    if (color.startsWith("#")) {
+      const r = parseInt(color.slice(1, 3), 16);
+      const g = parseInt(color.slice(3, 5), 16);
+      const b = parseInt(color.slice(5, 7), 16);
+      const gray = Math.round(r * 0.3 + g * 0.3 + b * 0.3);
+      return `rgb(${Math.round(r * 0.4 + gray * 0.6)}, ${Math.round(g * 0.4 + gray * 0.6)}, ${Math.round(b * 0.4 + gray * 0.6)})`;
+    }
+    return color;
+  }
+
+  /** Draw a robot as a sleek dart fighter ship */
   private drawRobot(robot: Robot, isSelected: boolean, now: number): void {
     const ctx = this.ctx;
     const robotId = `${robot.position.q},${robot.position.r}`;
@@ -411,18 +424,16 @@ export class BoardRenderer {
     const { x, y } =
       animatedPos || this.hexToPixel(robot.position.q, robot.position.r);
 
-    // Select colors based on player and locked state
+    // Select colors based on player
     let primaryColor: string;
-    let dimColor: string;
     if (robot.player === 0) {
       primaryColor = this.colors.player1;
-      dimColor = this.colors.player1Dim;
     } else {
       primaryColor = this.colors.player2;
-      dimColor = this.colors.player2Dim;
     }
 
-    const color = robot.isLockedDown ? dimColor : primaryColor;
+    // Desaturate color if locked down
+    const color = robot.isLockedDown ? this.desaturateColor(primaryColor) : primaryColor;
     const baseRadius = this.hexSize * 0.5;
     const radius = baseRadius * scale;
 
@@ -459,44 +470,69 @@ export class BoardRenderer {
       ctx.shadowBlur = 0;
     }
 
-    // Draw robot body (circle)
-    ctx.beginPath();
-    ctx.arc(x, y, radius, 0, Math.PI * 2);
-    ctx.fillStyle = color;
-    ctx.fill();
-
-    // Add gradient effect
-    const gradient = ctx.createRadialGradient(
-      x - radius * 0.3,
-      y - radius * 0.3,
-      0,
-      x,
-      y,
-      radius,
-    );
-    gradient.addColorStop(0, "rgba(255, 255, 255, 0.3)");
-    gradient.addColorStop(1, "rgba(0, 0, 0, 0.2)");
-    ctx.fillStyle = gradient;
-    ctx.fill();
-
-    // Draw direction indicator (triangle arrow)
-    const arrowLength = radius * 0.8;
-    const arrowWidth = radius * 0.5;
-
-    // Calculate arrow direction angle (use animated angle if available)
+    // Calculate direction angle (use animated angle if available)
     const angle = animatedAngle ?? directionToAngle(robot.direction);
 
+    // Draw the dart fighter ship
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(angle);
 
+    // Engine glow (back of ship) - only when not locked down
+    if (!robot.isLockedDown) {
+      const glowGradient = ctx.createRadialGradient(
+        -radius * 0.5, 0, 0,
+        -radius * 0.5, 0, radius * 0.35
+      );
+      // Create gradient stops using rgba format
+      const r = parseInt(primaryColor.slice(1, 3), 16);
+      const g = parseInt(primaryColor.slice(3, 5), 16);
+      const b = parseInt(primaryColor.slice(5, 7), 16);
+      glowGradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, 1)`);
+      glowGradient.addColorStop(0.5, `rgba(${r}, ${g}, ${b}, 0.5)`);
+      glowGradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+
+      ctx.beginPath();
+      ctx.arc(-radius * 0.5, 0, radius * 0.35, 0, Math.PI * 2);
+      ctx.fillStyle = glowGradient;
+      ctx.fill();
+    }
+
+    // Main hull - sleek dart shape
     ctx.beginPath();
-    ctx.moveTo(radius * 0.3, 0); // Tip
-    ctx.lineTo(-arrowLength * 0.5 + radius * 0.3, -arrowWidth / 2);
-    ctx.lineTo(-arrowLength * 0.5 + radius * 0.3, arrowWidth / 2);
+    ctx.moveTo(radius * 0.95, 0);               // Sharp nose
+    ctx.lineTo(radius * 0.3, -radius * 0.15);   // Front upper
+    ctx.lineTo(-radius * 0.2, -radius * 0.35);  // Wing upper
+    ctx.lineTo(-radius * 0.5, -radius * 0.15);  // Wing tip upper
+    ctx.lineTo(-radius * 0.4, 0);               // Back center
+    ctx.lineTo(-radius * 0.5, radius * 0.15);   // Wing tip lower
+    ctx.lineTo(-radius * 0.2, radius * 0.35);   // Wing lower
+    ctx.lineTo(radius * 0.3, radius * 0.15);    // Front lower
     ctx.closePath();
-    ctx.fillStyle = "#FFFFFF";
+
+    ctx.fillStyle = color;
     ctx.fill();
+
+    // Cockpit detail
+    ctx.beginPath();
+    ctx.moveTo(radius * 0.6, 0);
+    ctx.lineTo(radius * 0.2, -radius * 0.08);
+    ctx.lineTo(radius * 0.2, radius * 0.08);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+    ctx.fill();
+
+    // Wing highlight lines
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(radius * 0.3, -radius * 0.15);
+    ctx.lineTo(-radius * 0.4, -radius * 0.1);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(radius * 0.3, radius * 0.15);
+    ctx.lineTo(-radius * 0.4, radius * 0.1);
+    ctx.stroke();
 
     ctx.restore();
 
