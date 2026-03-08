@@ -9,6 +9,8 @@ export interface LobbyOptions {
   container: HTMLElement;
   /** Called when player wants to create a game */
   onCreateGame: (playerName: string) => Promise<string | null>;
+  /** Called when player wants to create an AI game */
+  onCreateAIGame?: (playerName: string, aiDepth: number) => Promise<string | null>;
   /** Called when player wants to join a game */
   onJoinGame: (gameCode: string, playerName: string) => void;
   /** Called when a game is created and the player should connect */
@@ -60,6 +62,7 @@ export function parseGameCode(input: string): string | null {
 export class LobbyUI {
   private container: HTMLElement;
   private onCreateGame: (playerName: string) => Promise<string | null>;
+  private onCreateAIGame?: (playerName: string, aiDepth: number) => Promise<string | null>;
   private onJoinGame: (gameCode: string, playerName: string) => void;
   private onConnectToGame?: (gameCode: string, playerName: string) => void;
 
@@ -67,10 +70,12 @@ export class LobbyUI {
   private lobbyEl: HTMLElement;
   private playerName: string;
   private gameCode: string | null = null;
+  private aiDepth: number = 3; // Default to Medium difficulty
 
   constructor(options: LobbyOptions) {
     this.container = options.container;
     this.onCreateGame = options.onCreateGame;
+    this.onCreateAIGame = options.onCreateAIGame;
     this.onJoinGame = options.onJoinGame;
     this.onConnectToGame = options.onConnectToGame;
 
@@ -139,6 +144,18 @@ export class LobbyUI {
   }
 
   private renderLanding(): void {
+    const hasAIGame = !!this.onCreateAIGame;
+    const difficultyOptions = hasAIGame ? `
+      <div class="form-group">
+        <label>AI Difficulty</label>
+        <div class="difficulty-selector">
+          <button class="difficulty-btn ${this.aiDepth === 2 ? 'active' : ''}" data-depth="2">Easy</button>
+          <button class="difficulty-btn ${this.aiDepth === 3 ? 'active' : ''}" data-depth="3">Medium</button>
+          <button class="difficulty-btn ${this.aiDepth === 4 ? 'active' : ''}" data-depth="4">Hard</button>
+        </div>
+      </div>
+    ` : '';
+
     this.lobbyEl.innerHTML = `
       <div class="lobby-content">
         <div class="lobby-header">
@@ -160,8 +177,11 @@ export class LobbyUI {
             />
           </div>
 
+          ${difficultyOptions}
+
           <div class="lobby-buttons">
             <button id="btn-create" class="primary">Create Game</button>
+            ${hasAIGame ? '<button id="btn-vs-ai" class="secondary">Play vs AI</button>' : ''}
             <button id="btn-join">Join Game</button>
           </div>
 
@@ -181,6 +201,8 @@ export class LobbyUI {
     const nameInput = this.lobbyEl.querySelector('#player-name') as HTMLInputElement;
     const btnCreate = this.lobbyEl.querySelector('#btn-create');
     const btnJoin = this.lobbyEl.querySelector('#btn-join');
+    const btnVsAI = this.lobbyEl.querySelector('#btn-vs-ai');
+    const difficultyBtns = this.lobbyEl.querySelectorAll('.difficulty-btn');
 
     // Update player name on input
     nameInput?.addEventListener('input', () => {
@@ -192,10 +214,28 @@ export class LobbyUI {
       nameInput.focus();
     }
 
+    // Difficulty selector
+    difficultyBtns.forEach(btn => {
+      btn?.addEventListener('click', () => {
+        const depth = parseInt((btn as HTMLElement).dataset.depth || '3', 10);
+        this.aiDepth = depth;
+        // Update active state
+        difficultyBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+    });
+
     btnCreate?.addEventListener('click', () => {
       if (this.validateName()) {
         savePlayerName(this.playerName);
         this.handleCreateClick();
+      }
+    });
+
+    btnVsAI?.addEventListener('click', () => {
+      if (this.validateName()) {
+        savePlayerName(this.playerName);
+        this.handleVsAIClick();
       }
     });
 
@@ -238,6 +278,38 @@ export class LobbyUI {
       }
     }).catch(() => {
       this.showError('Failed to create game. Please try again.');
+      this.currentMode = 'landing';
+      this.render();
+    });
+  }
+
+  private handleVsAIClick(): void {
+    this.currentMode = 'create';
+    this.render();
+
+    if (!this.onCreateAIGame) {
+      this.showError('AI game mode not available');
+      this.currentMode = 'landing';
+      this.render();
+      return;
+    }
+
+    this.onCreateAIGame(this.playerName, this.aiDepth).then((code) => {
+      if (code) {
+        this.gameCode = code;
+        this.currentMode = 'waiting';
+        this.render();
+        // Connect to game room via WebSocket
+        if (this.onConnectToGame) {
+          this.onConnectToGame(code, this.playerName);
+        }
+      } else {
+        this.showError('Failed to create AI game. Please try again.');
+        this.currentMode = 'landing';
+        this.render();
+      }
+    }).catch(() => {
+      this.showError('Failed to create AI game. Please try again.');
       this.currentMode = 'landing';
       this.render();
     });

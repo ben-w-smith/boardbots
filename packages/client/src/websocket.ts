@@ -15,6 +15,8 @@ export interface ServerMessage {
   index?: number;
   winner?: number;
   winnerName?: string;
+  aiEnabled?: boolean;
+  aiPlayerIndex?: number;
 }
 
 export interface GameSocketOptions {
@@ -38,7 +40,7 @@ export class GameSocket {
   private _status: ConnectionStatus = 'disconnected';
 
   // Callbacks
-  private onStateUpdateCallback: ((state: TransportState | null, players: string[], phase: string) => void) | null = null;
+  private onStateUpdateCallback: ((state: TransportState | null, players: string[], phase: string, aiEnabled?: boolean, aiPlayerIndex?: number) => void) | null = null;
   private onErrorCallback: ((msg: string) => void) | null = null;
   private onStatusChangeCallback: ((status: ConnectionStatus) => void) | null = null;
   private onPlayerJoinedCallback: ((name: string, index: number) => void) | null = null;
@@ -127,7 +129,7 @@ export class GameSocket {
     switch (msg.type) {
       case 'gameState':
         if (msg.players && msg.phase) {
-          this.onStateUpdateCallback?.(msg.state ?? null, msg.players, msg.phase);
+          this.onStateUpdateCallback?.(msg.state ?? null, msg.players, msg.phase, msg.aiEnabled, msg.aiPlayerIndex);
         }
         break;
       case 'error':
@@ -212,6 +214,11 @@ export class GameSocket {
     this.send({ type: 'rematch' });
   }
 
+  /** Start an AI game with specified difficulty */
+  startAIGame(aiDepth: number): void {
+    this.send({ type: 'startAIGame', aiDepth });
+  }
+
   private send(msg: unknown): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(msg));
@@ -219,7 +226,7 @@ export class GameSocket {
   }
 
   // Callback registration
-  onStateUpdate(callback: (state: TransportState | null, players: string[], phase: string) => void): void {
+  onStateUpdate(callback: (state: TransportState | null, players: string[], phase: string, aiEnabled?: boolean, aiPlayerIndex?: number) => void): void {
     this.onStateUpdateCallback = callback;
   }
 

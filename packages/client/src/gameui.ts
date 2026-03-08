@@ -41,6 +41,8 @@ export class GameUI {
   private phase: string = 'waiting';
   private moveHistory: string[] = [];
   private selectedRobotPosition: Pair | null = null;
+  private aiEnabled: boolean = false;
+  private aiPlayerIndex?: number;
 
   constructor(options: GameUIOptions) {
     this.container = options.container;
@@ -259,10 +261,12 @@ export class GameUI {
   }
 
   /** Update game state from transport */
-  updateFromTransport(transportState: TransportState, players: string[], phase: string): void {
+  updateFromTransport(transportState: TransportState, players: string[], phase: string, aiEnabled?: boolean, aiPlayerIndex?: number): void {
     this.gameState = fromTransport(transportState);
     this.playerNames = players;
     this.phase = phase;
+    this.aiEnabled = aiEnabled ?? false;
+    this.aiPlayerIndex = aiPlayerIndex;
     this.render();
   }
 
@@ -475,9 +479,22 @@ export class GameUI {
       if (scoreEl) scoreEl.textContent = `(${info.points} pts)`;
       if (robotsEl) robotsEl.textContent = `Robots: ${info.robotsOnBoard} (${info.robotsRemaining} reserve)`;
 
-      // Highlight active player
+      // Highlight active player and show AI indicator
       const isActive = this.gameState.playerTurn === i;
+      const isAI = this.aiEnabled && i === this.aiPlayerIndex;
       playerEl.classList.toggle('active-player', isActive);
+      playerEl.classList.toggle('ai-player', isAI);
+
+      // Show AI badge
+      let aiBadge = playerEl.querySelector('.ai-badge');
+      if (isAI && !aiBadge) {
+        aiBadge = document.createElement('span');
+        aiBadge.className = 'ai-badge';
+        aiBadge.textContent = '🤖 AI';
+        playerEl.appendChild(aiBadge);
+      } else if (!isAI && aiBadge) {
+        aiBadge.remove();
+      }
     }
   }
 
@@ -509,17 +526,26 @@ export class GameUI {
         if (turnControls) (turnControls as HTMLElement).style.display = 'none';
         if (waitingControls) (waitingControls as HTMLElement).style.display = 'flex';
         if (btnAI) btnAI.style.display = 'none';
-        // Only host can start
+        // Only host can start, or AI game starts immediately
         if (btnStart) {
-          btnStart.disabled = this.playerNames.length < 2;
+          // Disable start button for AI games (they auto-start)
+          btnStart.disabled = this.aiEnabled || this.playerNames.length < 2;
+          if (this.aiEnabled) {
+            btnStart.style.display = 'none';
+          } else {
+            btnStart.style.display = 'inline-block';
+          }
         }
         break;
       case 'playing':
         if (turnControls) (turnControls as HTMLElement).style.display = 'flex';
         if (waitingControls) (waitingControls as HTMLElement).style.display = 'none';
         if (btnAI) {
-          btnAI.style.display = 'inline-block';
-          btnAI.disabled = !this.gameState || this.gameState.playerTurn !== this.myPlayerIndex;
+          // Hide AI button in AI games (moves are automatic)
+          btnAI.style.display = this.aiEnabled ? 'none' : 'inline-block';
+          if (!this.aiEnabled) {
+            btnAI.disabled = !this.gameState || this.gameState.playerTurn !== this.myPlayerIndex;
+          }
         }
         break;
       case 'finished':

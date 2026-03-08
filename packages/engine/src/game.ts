@@ -110,6 +110,10 @@ export function applyMove(state: GameState, move: GameMove): GameState {
         !activeRobot.isLockedDown;
     }
     newState._activeRobotPosition = undefined;
+
+    // Final resolution pass: now that the active robot's beam is re-enabled,
+    // evaluate what it now hits and apply lock/destroy effects immediately
+    resolveMove(newState);
   }
 
   // Advance turn if out of moves

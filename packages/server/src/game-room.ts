@@ -11,6 +11,7 @@ import {
   type TransportState,
 } from "@lockitdown/engine";
 import { dbService, type GameRecord } from "./db.js";
+import type { JwtPayload } from "./auth/index.js";
 
 // Standard 2-player game definition
 const DEFAULT_GAME_DEF: GameDef = {
@@ -28,6 +29,11 @@ interface PersistedGame {
   phase: "waiting" | "playing" | "finished";
   createdAt: number;
   hostName: string | null;
+  userId: number | null;
+  winnerId: number | null;
+  aiEnabled: boolean;
+  aiDepth: number;
+  aiPlayerIndex?: number;
 }
 
 // Client -> Server messages
@@ -35,6 +41,7 @@ type ClientMessage =
   | { type: "join"; playerName: string }
   | { type: "move"; move: GameMove }
   | { type: "startGame" }
+  | { type: "startAIGame"; aiDepth: number }
   | { type: "rematch" }
   | { type: "requestAI" };
 
@@ -45,6 +52,8 @@ type ServerMessage =
       state: TransportState | null;
       players: string[];
       phase: string;
+      aiEnabled?: boolean;
+      aiPlayerIndex?: number;
     }
   | { type: "error"; message: string }
   | { type: "playerJoined"; name: string; index: number }
@@ -56,6 +65,7 @@ interface WSAttachment {
   playerName: string;
   playerIndex: number;
   isSpectator: boolean;
+  user?: JwtPayload | null;
 }
 
 export class GameRoom {
@@ -64,6 +74,7 @@ export class GameRoom {
   private sessions: Map<WebSocket, WSAttachment> = new Map();
   private loaded = false;
   private cleanupTimer: ReturnType<typeof setTimeout> | null = null;
+  private pendingAIMove: ReturnType<typeof setTimeout> | null = null;
   private onEmpty?: (gameCode: string) => void;
 
   constructor(gameCode: string, onEmpty?: (gameCode: string) => void) {
@@ -76,12 +87,22 @@ export class GameRoom {
       phase: "waiting",
       createdAt: Date.now(),
       hostName: null,
+      userId: null,
+      winnerId: null,
+      aiEnabled: false,
+      aiDepth: 3,
+      aiPlayerIndex: undefined,
     };
   }
 
   // Called when a new WebSocket connection is established
-  public async handleConnection(ws: WebSocket): Promise<void> {
+  public async handleConnection(ws: WebSocket, user?: JwtPayload | null): Promise<void> {
     await this.ensureLoaded();
+
+    // Store user info on WebSocket for later use
+    if (user) {
+      (ws as any).user = user;
+    }
 
     ws.on("message", async (data) => {
       try {
@@ -97,7 +118,7 @@ export class GameRoom {
     });
 
     // Send current game state to the new connection immediately
-    this.sendGameState(ws);
+    this.sendTo(ws, this.buildGameStateMessage());
   }
 
   private async handleMessage(ws: WebSocket, message: string): Promise<void> {
@@ -118,6 +139,9 @@ export class GameRoom {
         break;
       case "startGame":
         await this.handleStartGame(ws);
+        break;
+      case "startAIGame":
+        await this.handleStartAIGame(ws, msg.aiDepth);
         break;
       case "rematch":
         await this.handleRematch(ws);
@@ -170,10 +194,12 @@ export class GameRoom {
     const existingPlayer = this.persisted.players.get(playerName);
     if (existingPlayer) {
       existingPlayer.connected = true;
+      const user = (ws as any).user;
       this.sessions.set(ws, {
         playerName,
         playerIndex: existingPlayer.index,
         isSpectator: false,
+        user: user || null,
       });
 
       this.saveState();
@@ -191,17 +217,20 @@ export class GameRoom {
     ).length;
 
     if (playerCount >= 2) {
+      const user = (ws as any).user;
       this.sessions.set(ws, {
         playerName,
         playerIndex: -1,
         isSpectator: true,
+        user: user || null,
       });
 
       this.sendTo(ws, {
         type: "error",
         message: "Game is full, joined as spectator",
       });
-      this.sendGameState(ws);
+      // Send game state without user (spectators don't need special handling)
+      this.sendTo(ws, this.buildGameStateMessage());
       return;
     }
 
@@ -212,14 +241,21 @@ export class GameRoom {
       connected: true,
     });
 
+    // Associate game with authenticated user if this is the first player
     if (playerIndex === 0) {
       this.persisted.hostName = playerName;
+      const user = (ws as any).user;
+      if (user) {
+        this.persisted.userId = user.userId;
+      }
     }
 
+    const user = (ws as any).user;
     this.sessions.set(ws, {
       playerName,
       playerIndex,
       isSpectator: false,
+      user: user || null,
     });
 
     this.saveState();
@@ -266,6 +302,66 @@ export class GameRoom {
     this.broadcastGameState();
   }
 
+  private async handleStartAIGame(ws: WebSocket, aiDepth: number): Promise<void> {
+    const attachment = this.sessions.get(ws);
+    if (!attachment || attachment.isSpectator) {
+      this.sendTo(ws, {
+        type: "error",
+        message: "Only players can start the game",
+      });
+      return;
+    }
+
+    if (this.persisted.hostName !== attachment.playerName) {
+      this.sendTo(ws, {
+        type: "error",
+        message: "Only the host can start the game",
+      });
+      return;
+    }
+
+    // Validate AI depth
+    const validDepths = [2, 3, 4];
+    if (!validDepths.includes(aiDepth)) {
+      this.sendTo(ws, {
+        type: "error",
+        message: "Invalid AI depth. Must be 2 (Easy), 3 (Medium), or 4 (Hard)",
+      });
+      return;
+    }
+
+    // Need at least 1 human player
+    const humanPlayers = Array.from(this.persisted.players.values()).filter(
+      (p) => p.index < 1 && p.connected,
+    );
+
+    if (humanPlayers.length < 1) {
+      this.sendTo(ws, { type: "error", message: "Need at least 1 human player" });
+      return;
+    }
+
+    // Set up AI game
+    this.persisted.aiEnabled = true;
+    this.persisted.aiDepth = aiDepth;
+    this.persisted.aiPlayerIndex = 1; // AI is player 1
+
+    // Add AI player to the game
+    this.persisted.players.set("AI", {
+      name: "AI",
+      index: 1,
+      connected: true, // AI is always "connected"
+    });
+
+    this.persisted.gameState = createGame(DEFAULT_GAME_DEF);
+    this.persisted.phase = "playing";
+
+    this.saveState();
+    this.broadcastGameState();
+
+    // Trigger AI move if it's AI's turn first
+    await this.maybeTriggerAIMove();
+  }
+
   private async handleMove(ws: WebSocket, move: GameMove): Promise<void> {
     if (this.persisted.phase !== "playing" || !this.persisted.gameState) {
       this.sendTo(ws, { type: "error", message: "Game not in progress" });
@@ -294,6 +390,8 @@ export class GameRoom {
       if (!(await this.checkAndHandleGameOver())) {
         this.saveState();
         this.broadcastGameState();
+        // Trigger AI move if it's AI's turn
+        await this.maybeTriggerAIMove();
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Invalid move";
@@ -347,8 +445,91 @@ export class GameRoom {
     this.persisted.gameState = null;
     this.persisted.phase = "waiting";
 
+    // Keep AI settings for rematch
+    // Don't reset aiEnabled, aiDepth, aiPlayerIndex
+
     this.saveState();
     this.broadcastGameState();
+  }
+
+  /**
+   * Trigger AI move if it's AI's turn.
+   * Handles race conditions and timeout gracefully.
+   */
+  private async maybeTriggerAIMove(): Promise<void> {
+    // Cancel any pending AI move
+    if (this.pendingAIMove) {
+      clearTimeout(this.pendingAIMove);
+      this.pendingAIMove = null;
+    }
+
+    if (
+      this.persisted.phase !== "playing" ||
+      !this.persisted.gameState ||
+      !this.persisted.aiEnabled
+    ) {
+      return;
+    }
+
+    const currentTurn = this.persisted.gameState.playerTurn;
+    const aiPlayerIndex = this.persisted.aiPlayerIndex ?? 1;
+
+    if (currentTurn !== aiPlayerIndex) {
+      return;
+    }
+
+    // Schedule AI move with a small delay for realism
+    this.pendingAIMove = setTimeout(async () => {
+      // Double-check state hasn't changed during timeout
+      if (
+        this.persisted.phase !== "playing" ||
+        !this.persisted.gameState ||
+        this.persisted.gameState.playerTurn !== aiPlayerIndex ||
+        !this.persisted.aiEnabled
+      ) {
+        this.pendingAIMove = null;
+        return;
+      }
+
+      const startTime = Date.now();
+      const timeoutMs = 1000; // 1 second timeout
+
+      const result = findBestMove(
+        this.persisted.gameState,
+        aiPlayerIndex,
+        this.persisted.aiDepth,
+        timeoutMs,
+      );
+
+      const elapsed = Date.now() - startTime;
+      console.log(`AI move took ${elapsed}ms (depth: ${this.persisted.aiDepth})`);
+
+      if (!result.move) {
+        console.warn("AI could not find a valid move, passing turn");
+        // AI couldn't find a move - game might be stuck
+        // For now, we'll pass and let the game continue
+        this.pendingAIMove = null;
+        return;
+      }
+
+      try {
+        this.persisted.gameState = applyMove(this.persisted.gameState, result.move);
+
+        if (!(await this.checkAndHandleGameOver())) {
+          this.saveState();
+          this.broadcastGameState();
+
+          // Check if AI gets another turn (multi-action turn)
+          if (this.persisted.gameState!.playerTurn === aiPlayerIndex) {
+            await this.maybeTriggerAIMove();
+          }
+        }
+      } catch (err) {
+        console.error("AI move failed:", err);
+      }
+
+      this.pendingAIMove = null;
+    }, 500); // 500ms thinking time for realism
   }
 
   private async ensureLoaded(): Promise<void> {
@@ -361,6 +542,11 @@ export class GameRoom {
         phase: record.phase as any,
         createdAt: record.createdAt,
         hostName: record.hostName,
+        userId: record.userId ?? null,
+        winnerId: record.winnerId ?? null,
+        aiEnabled: record.aiEnabled ?? false,
+        aiDepth: record.aiDepth ?? 3,
+        aiPlayerIndex: record.aiPlayerIndex,
       };
     }
     this.loaded = true;
@@ -377,6 +563,11 @@ export class GameRoom {
       phase: this.persisted.phase,
       createdAt: this.persisted.createdAt,
       hostName: this.persisted.hostName,
+      userId: this.persisted.userId,
+      winnerId: this.persisted.winnerId,
+      aiEnabled: this.persisted.aiEnabled,
+      aiDepth: this.persisted.aiDepth,
+      aiPlayerIndex: this.persisted.aiPlayerIndex,
     });
   }
 
@@ -408,6 +599,8 @@ export class GameRoom {
         : null,
       players: playerNames,
       phase: this.persisted.phase,
+      aiEnabled: this.persisted.aiEnabled,
+      aiPlayerIndex: this.persisted.aiPlayerIndex,
     };
   }
 
@@ -421,10 +614,21 @@ export class GameRoom {
     const { isOver, winner } = checkGameOver(this.persisted.gameState);
     if (isOver) {
       this.persisted.phase = "finished";
-      const winnerName =
-        Array.from(this.persisted.players.values()).find(
-          (p) => p.index === winner,
-        )?.name ?? "Unknown";
+      const winnerPlayer = Array.from(this.persisted.players.values()).find(
+        (p) => p.index === winner,
+      );
+      const winnerName = winnerPlayer?.name ?? "Unknown";
+
+      // Find the WebSocket for the winner and get their userId
+      const winnerSession = Array.from(this.sessions.entries()).find(
+        ([, attachment]) => attachment.playerName === winnerName && attachment.user,
+      );
+
+      if (winnerSession && winnerSession[1].user) {
+        this.persisted.winnerId = winnerSession[1].user.userId;
+        // Update the game record with the winner
+        dbService.updateGameWinner(this.gameCode, winnerSession[1].user.userId);
+      }
 
       this.saveState();
       this.broadcastGameState();
@@ -434,7 +638,4 @@ export class GameRoom {
     return false;
   }
 
-  private sendGameState(ws: WebSocket): void {
-    this.sendTo(ws, this.buildGameStateMessage());
-  }
 }

@@ -2,9 +2,11 @@ import express from "express";
 import { createServer } from "http";
 import { WebSocketServer } from "ws";
 import cors from "cors";
+import helmet from "helmet";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { RoomManager } from "./RoomManager.js";
+import { authRoutes, verifyToken, validateJwtSecret } from "./auth/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,7 +14,30 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(cors());
+// Security headers
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "ws:", "wss:"],
+    },
+  },
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true,
+  },
+}));
+
+// CORS configuration
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || "http://localhost:5173",
+  credentials: true,
+}));
+
 app.use(express.json());
 
 const clientDistPath = path.join(__dirname, "../../client/dist");
@@ -32,6 +57,9 @@ function generateGameCode(): string {
 app.get("/api/health", (req, res) => {
   res.send("OK");
 });
+
+// Auth routes
+app.use("/api/auth", authRoutes);
 
 // Create a new game lobby
 app.post("/api/lobby/create", (req, res) => {
@@ -63,13 +91,32 @@ server.on("upgrade", (request, socket, head) => {
       return;
     }
 
+    // Extract optional auth token from Sec-WebSocket-Protocol header
+    // The protocol header format is: "Sec-WebSocket-Protocol: auth-token, <token>"
+    // We extract the token value after "auth-token,"
+    const protocolHeader = request.headers["sec-websocket-protocol"];
+    let token: string | null = null;
+    if (protocolHeader) {
+      const protocols = protocolHeader.split(",").map((p) => p.trim());
+      const authProtocol = protocols.find((p) => p.startsWith("auth-token,"));
+      if (authProtocol) {
+        token = authProtocol.replace("auth-token,", "").trim();
+      }
+    }
+
+    const user = token ? verifyToken(token) : null;
+
+    // Handle upgrade, accepting the auth-token protocol if provided
     wss.handleUpgrade(request, socket, head, (ws) => {
-      RoomManager.getInstance().handleConnection(gameCode, ws);
+      RoomManager.getInstance().handleConnection(gameCode, ws, user);
     });
   } else {
     socket.destroy();
   }
 });
+
+// Validate environment configuration before starting server
+validateJwtSecret();
 
 server.listen(port, () => {
   console.log(`Server listening on port ${port}`);

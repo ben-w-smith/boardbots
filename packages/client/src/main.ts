@@ -145,6 +145,32 @@ const lobbyUI = new LobbyUI({
     }
     return null;
   },
+  onCreateAIGame: async (playerName: string, aiDepth: number): Promise<string | null> => {
+    currentPlayerName = playerName;
+    savePlayerName(playerName);
+
+    try {
+      // Create game normally first to get game code
+      const response = await fetch("/api/lobby/create", { method: "POST" });
+      if (response.ok) {
+        const data = await response.json();
+        const gameCode = data.gameCode;
+
+        // Connect to the game
+        socket.connect(gameCode, playerName);
+
+        // Wait a bit for connection to establish, then start AI game
+        setTimeout(() => {
+          socket.startAIGame(aiDepth);
+        }, 500);
+
+        return gameCode;
+      }
+    } catch (error) {
+      console.error("Failed to create AI game:", error);
+    }
+    return null;
+  },
   onJoinGame: (gameCode: string, playerName: string) => {
     currentPlayerName = playerName;
     currentGameCode = gameCode;
@@ -166,7 +192,7 @@ const lobbyUI = new LobbyUI({
 
 // Set up WebSocket callbacks
 socket.onStateUpdate(
-  (transportState: TransportState | null, players: string[], phase: string) => {
+  (transportState: TransportState | null, players: string[], phase: string, aiEnabled?: boolean, aiPlayerIndex?: number) => {
     currentPlayers = players;
     currentPhase = phase;
 
@@ -179,7 +205,9 @@ socket.onStateUpdate(
       if (previousState && previousState.playerTurn !== state.playerTurn) {
         // Play turn sound for the player whose turn it is
         const newTurnPlayerIndex = state.playerTurn;
-        if (newTurnPlayerIndex === myPlayerIndex) {
+        // Don't play turn sound for AI turns
+        const isAITurn = aiEnabled && newTurnPlayerIndex === aiPlayerIndex;
+        if (newTurnPlayerIndex === myPlayerIndex && !isAITurn) {
           audioManager.playTurnSound();
         }
       }
@@ -188,7 +216,7 @@ socket.onStateUpdate(
       detectAndAnimateChanges();
 
       inputHandler.setGameState(state);
-      gameUI.updateFromTransport(transportState, players, phase);
+      gameUI.updateFromTransport(transportState, players, phase, aiEnabled, aiPlayerIndex);
     }
 
     // Find my player index
@@ -206,6 +234,7 @@ socket.onStateUpdate(
     }
 
     // When both players connected in waiting phase, show game view with Start button
+    // For AI games, transition immediately when phase becomes playing
     if (phase === "waiting" && players.length >= 2) {
       lobbyUI.hide();
       gameUI.show();

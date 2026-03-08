@@ -1,5 +1,6 @@
 import type { WebSocket } from "ws";
 import { GameRoom } from "./game-room.js";
+import type { JwtPayload } from "./auth/index.js";
 
 export class RoomManager {
   private static instance: RoomManager;
@@ -17,6 +18,7 @@ export class RoomManager {
   public async handleConnection(
     gameCode: string,
     ws: WebSocket,
+    user?: JwtPayload | null,
   ): Promise<void> {
     let room = this.rooms.get(gameCode);
 
@@ -25,7 +27,7 @@ export class RoomManager {
       this.rooms.set(gameCode, room);
     }
 
-    await room.handleConnection(ws);
+    await room.handleConnection(ws, user);
   }
 
   /**

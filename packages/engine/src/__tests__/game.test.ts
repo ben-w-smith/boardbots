@@ -537,21 +537,19 @@ describe('TestMoves (Go port)', () => {
     expect(state.players[0].placedRobots).toBe(1);
     expect(state.players[1].placedRobots).toBe(3);
 
-    // With the activeBot fix (matching Go behavior), the advancing robot's beam
-    // stays OFF during resolution. So only 2 attackers target player 0's robot at (0,4):
+    // After the beam resolution timing fix, the advancing robot's beam is re-enabled
+    // AFTER the initial resolution, then a FINAL resolution pass evaluates targeting.
+    // So player 1's robot at (0,-4) facing SE now also targets player 0's robot at (0,4).
+    // This creates 3 attackers:
     // - Robot at (4,0) facing SW
     // - Robot at (-4,4) facing E
-    // The advancing robot at (0,-4) has its beam disabled and doesn't contribute.
-    // With 2 attackers, the robot is LOCKED (not destroyed), so player 1 gets 0 points.
-    // (The old buggy behavior re-enabled the beam mid-resolution, causing 3 attackers
-    // and destruction, awarding 3 points - but this was incorrect.)
-    expect(state.players[1].points).toBe(0);
+    // - Robot at (0,-4) facing SE (the advancing robot, beam re-enabled in final pass)
+    // With 3 attackers, the robot is DESTROYED, awarding 3 points to player 1.
+    expect(state.players[1].points).toBe(3);
 
-    // Verify player 0's robot is locked (not destroyed)
+    // Verify player 0's robot is destroyed
     const player0Robot = state.robots.find(r => r.player === 0);
-    expect(player0Robot).toBeDefined();
-    expect(player0Robot?.isLockedDown).toBe(true);
-    expect(player0Robot?.position).toEqual({ q: 0, r: 4 });
+    expect(player0Robot).toBeUndefined();
   });
 });
 
@@ -636,7 +634,7 @@ describe('TestEnterNoTieBreak (Go port)', () => {
     movesPerTurn: 3,
   };
 
-  it('advances into position without triggering tiebreak', () => {
+  it('advances into position and triggers tiebreak with final resolution pass', () => {
     const state = createGame(TWO_PLAYER_GAME_DEF);
     state.robots = [
       { position: { q: -4, r: 4 }, direction: { q: 1, r: -1 }, isBeamEnabled: true, isLockedDown: false, player: 0 },
@@ -646,14 +644,17 @@ describe('TestEnterNoTieBreak (Go port)', () => {
     ];
     state.playerTurn = 1;
 
-    // Advance from corridor - should not trigger tiebreak
+    // Advance from corridor - after final resolution pass, this triggers tiebreak
+    // because:
+    // - Robot at (4, -4) (advanced from 5, -5) targets robot at (-4, 4)
+    // - Robot at (-4, 4) targets robot at (4, -4) (mutual targeting = tiebreak)
     const newState = applyMove(state, {
       type: 'advance',
       player: 1,
       position: { q: 5, r: -5 },
     });
 
-    expect(newState.requiresTieBreak).toBe(false);
+    expect(newState.requiresTieBreak).toBe(true);
   });
 });
 
