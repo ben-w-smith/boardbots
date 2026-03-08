@@ -5,6 +5,7 @@ import { InputHandler, type InputState } from "./input.js";
 import { GameSocket } from "./websocket.js";
 import { LobbyUI, getSavedPlayerName, savePlayerName } from "./lobby.js";
 import { animator } from "./animator.js";
+import { getAudioManager } from "./audio.js";
 import {
   initWebMCP,
   logMoveForMCP,
@@ -57,6 +58,9 @@ let currentGameCode: string = urlGameCode;
 let currentPlayerName: string = urlPlayerName;
 let currentPlayers: string[] = [];
 let currentPhase: string = "waiting";
+
+// Initialize audio manager
+const audioManager = getAudioManager();
 
 // Initialize canvas renderer
 const canvas = document.querySelector<HTMLCanvasElement>("#gameCanvas")!;
@@ -170,6 +174,15 @@ socket.onStateUpdate(
     if (transportState) {
       previousState = state;
       state = fromTransport(transportState);
+
+      // Detect turn change - play sound if it became my turn
+      if (previousState && previousState.playerTurn !== state.playerTurn) {
+        // Play turn sound for the player whose turn it is
+        const newTurnPlayerIndex = state.playerTurn;
+        if (newTurnPlayerIndex === myPlayerIndex) {
+          audioManager.playTurnSound();
+        }
+      }
 
       // Detect changes and trigger animations
       detectAndAnimateChanges();
@@ -300,6 +313,10 @@ socket.onStatusChange((status) => {
 });
 
 socket.onGameOver((winner: number, winnerName: string) => {
+  // Play victory sound if I won, defeat sound if I lost
+  if (winner === myPlayerIndex) {
+    audioManager.playVictorySound();
+  }
   gameUI.showGameOver(winner, winnerName);
 });
 
@@ -532,6 +549,13 @@ window.addEventListener("resize", handleResize);
 canvas.addEventListener("click", handleClick);
 canvas.addEventListener("contextmenu", handleContextMenu);
 
+// Sound toggle event listener
+window.addEventListener("soundToggle", () => {
+  const isMuted = audioManager.toggleMute();
+  // Dispatch event to update UI
+  window.dispatchEvent(new CustomEvent("soundStateChanged", { detail: { isMuted } }));
+});
+
 // Keyboard shortcuts
 document.addEventListener("keydown", (event) => {
   if (!isConnected && currentGameCode) return;
@@ -558,6 +582,12 @@ document.addEventListener("keydown", (event) => {
       if (inputState.selectedRobot) {
         inputHandler.handleAdvanceClick();
       }
+      break;
+    case "m":
+    case "M":
+      // Toggle sound with M key
+      const isMuted = audioManager.toggleMute();
+      window.dispatchEvent(new CustomEvent("soundStateChanged", { detail: { isMuted } }));
       break;
   }
 });

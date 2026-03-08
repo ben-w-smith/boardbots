@@ -60,6 +60,9 @@ export class GameUI {
     this.container.appendChild(this.statusPanel);
     this.container.appendChild(this.moveLog);
 
+    // Setup sound toggle button
+    this.setupSoundToggle();
+
     this.hide(); // Start hidden
   }
 
@@ -83,6 +86,9 @@ export class GameUI {
         <span class="player-score"></span>
         <span class="player-robots"></span>
       </div>
+      <button id="btn-sound-toggle" class="sound-toggle" title="Toggle Sound">
+        <span class="sound-icon">🔊</span>
+      </button>
     `;
     return panel;
   }
@@ -227,6 +233,29 @@ export class GameUI {
     btnRematch?.addEventListener('click', () => {
       this.onRematch();
     });
+  }
+
+  /** Setup sound toggle button in top panel */
+  private setupSoundToggle(): void {
+    const btnSoundToggle = this.topPanel.querySelector('#btn-sound-toggle');
+    const soundIcon = btnSoundToggle?.querySelector('.sound-icon');
+
+    const updateSoundIcon = (isMuted: boolean) => {
+      if (soundIcon) {
+        soundIcon.textContent = isMuted ? '🔇' : '🔊';
+      }
+    };
+
+    btnSoundToggle?.addEventListener('click', () => {
+      // Dispatch custom event for main.ts to handle
+      const event = new CustomEvent('soundToggle');
+      window.dispatchEvent(event);
+    });
+
+    // Listen for sound state changes
+    window.addEventListener('soundStateChanged', ((e: CustomEvent) => {
+      updateSoundIcon(e.detail.isMuted);
+    }) as EventListener);
   }
 
   /** Update game state from transport */
