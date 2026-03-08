@@ -348,16 +348,19 @@ export class BoardRenderer {
     const endX = startPos.x + Math.cos(angle) * beamLength;
     const endY = startPos.y + Math.sin(angle) * beamLength;
 
+    // Determine beam color based on player
+    const beamColor = robot.player === 0 ? "#00D4FF" : "#FF4444";
+
     ctx.beginPath();
     ctx.moveTo(startPos.x, startPos.y);
     ctx.lineTo(endX, endY);
 
-    ctx.strokeStyle = this.colors.beamColor;
+    ctx.strokeStyle = beamColor;
     ctx.lineWidth = 3;
     ctx.stroke();
 
     // Glow effect
-    ctx.shadowColor = this.colors.beamColor;
+    ctx.shadowColor = beamColor;
     ctx.shadowBlur = 10;
     ctx.stroke();
     ctx.shadowBlur = 0;
