@@ -1,5 +1,5 @@
 import type { GameState, GameMove, Pair, TurnDirection } from './types.js';
-import { CARDINALS, pairEq, pairAdd } from './hex.js';
+import { CARDINALS, pairEq, pairAdd, pairDist } from './hex.js';
 import { robotAt, isCorridor, robotIndexAt } from './game.js';
 import { computeEdges } from './edges.js';
 
@@ -38,11 +38,14 @@ export function possibleMoves(state: GameState): GameMove[] {
   for (const robot of state.robots) {
     if (robot.player !== player) continue;
 
-    // Advance: only if not locked down and destination is empty
+    // Advance: only if not locked down and destination is empty and within bounds
     if (!robot.isLockedDown) {
       const dest = pairAdd(robot.position, robot.direction);
+      const arenaRadius = state.gameDef.board.hexaBoard.arenaRadius;
+      const corridorRadius = arenaRadius + 1;
+      const destDist = pairDist(dest);
 
-      if (!robotAt(state, dest)) {
+      if (!robotAt(state, dest) && destDist <= corridorRadius) {
         moves.push({
           type: 'advance',
           player,

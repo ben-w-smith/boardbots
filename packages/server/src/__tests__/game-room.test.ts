@@ -133,7 +133,7 @@ describe("GameRoom", () => {
   });
 
   describe("reconnection", () => {
-    it("allows player to reconnect", async () => {
+    it("allows player to reconnect without broadcasting playerJoined", async () => {
       const ws1 = new MockWebSocket() as any;
       await gameRoom.handleConnection(ws1);
       ws1.emit(
@@ -153,12 +153,19 @@ describe("GameRoom", () => {
       );
       await flushMicrotasks();
 
+      // Should NOT send playerJoined on reconnection (only on first join)
       const joinMsg = ws2._messages.find(
         (m: string) =>
           JSON.parse(m).type === "playerJoined" &&
           JSON.parse(m).name === "Alice",
       );
-      expect(joinMsg).toBeDefined();
+      expect(joinMsg).toBeUndefined();
+
+      // But should still send gameState
+      const stateMsg = ws2._messages.find(
+        (m: string) => JSON.parse(m).type === "gameState",
+      );
+      expect(stateMsg).toBeDefined();
     });
   });
 

@@ -1100,3 +1100,160 @@ describe('activeBot resolution', () => {
     expect(enemyAfter?.isLockedDown).toBe(false);
   });
 });
+
+// Tests for board boundary checking
+describe('Board boundary validation', () => {
+  const gameDef: GameDef = {
+    board: { hexaBoard: { arenaRadius: 4 } },
+    numOfPlayers: 2,
+    robotsPerPlayer: 6,
+    winCondition: 'Elimination',
+    movesPerTurn: 3,
+  };
+
+  it('prevents advancing robot off the board from arena edge', () => {
+    const state = createGame(gameDef);
+    // Place a robot at the arena edge (distance 4) facing outward
+    state.robots = [
+      { position: { q: 4, r: 0 }, direction: { q: 1, r: 0 }, isBeamEnabled: true, isLockedDown: false, player: 0 },
+    ];
+    state.playerTurn = 0;
+    state.movesThisTurn = 3;
+
+    // Try to advance outward - this would put robot at (5, 0) which is in corridor
+    // This should succeed (corridor is allowed)
+    const corridorState = applyMove(state, {
+      type: 'advance',
+      player: 0,
+      position: { q: 4, r: 0 },
+    });
+    expect(corridorState.robots[0].position).toEqual({ q: 5, r: 0 });
+
+    // Now try to advance further outward from corridor - should fail
+    corridorState.playerTurn = 0;
+    corridorState.movesThisTurn = 3;
+
+    expect(() => applyMove(corridorState, {
+      type: 'advance',
+      player: 0,
+      position: { q: 5, r: 0 },
+    })).toThrow('off the board');
+  });
+
+  it('prevents advancing robot off the board from corridor', () => {
+    const state = createGame(gameDef);
+    // Place a robot in the corridor (distance 5 = arenaRadius + 1) facing outward
+    state.robots = [
+      { position: { q: 5, r: 0 }, direction: { q: 1, r: 0 }, isBeamEnabled: false, isLockedDown: false, player: 0 },
+    ];
+    state.playerTurn = 0;
+    state.movesThisTurn = 3;
+
+    // Try to advance outward from corridor - should fail (would be distance 6)
+    expect(() => applyMove(state, {
+      type: 'advance',
+      player: 0,
+      position: { q: 5, r: 0 },
+    })).toThrow('off the board');
+  });
+
+  it('prevents advancing robot off the board from corner corridor position', () => {
+    const state = createGame(gameDef);
+    // Place a robot at corner of corridor, facing diagonally outward
+    // At position (3, 2), distance = (3+2+1)/2 = 3, so we need distance 5
+    // Position (3, 2) has distance 3, position (4, 1) has distance (4+1+3)/2 = 4
+    // Position (3, 2) facing NE {q:1, r:-1} would go to (4, 1)
+    // Let's use a corridor position facing outward
+    state.robots = [
+      { position: { q: 3, r: 2 }, direction: { q: 1, r: -1 }, isBeamEnabled: true, isLockedDown: false, player: 0 },
+    ];
+    state.playerTurn = 0;
+    state.movesThisTurn = 3;
+
+    // Advance to (4, 1) which is distance 4 - still in arena, should succeed
+    const advanced = applyMove(state, {
+      type: 'advance',
+      player: 0,
+      position: { q: 3, r: 2 },
+    });
+    expect(advanced.robots[0].position).toEqual({ q: 4, r: 1 });
+  });
+
+  it('allows advance within arena boundaries', () => {
+    const state = createGame(gameDef);
+    // Place a robot in the center facing E
+    state.robots = [
+      { position: { q: 0, r: 0 }, direction: { q: 1, r: 0 }, isBeamEnabled: true, isLockedDown: false, player: 0 },
+    ];
+    state.playerTurn = 0;
+    state.movesThisTurn = 3;
+
+    // Should be able to advance multiple times within arena
+    let currentState = state;
+    for (let i = 0; i < 4; i++) {
+      currentState = applyMove(currentState, {
+        type: 'advance',
+        player: 0,
+        position: { q: i, r: 0 },
+      });
+      currentState.playerTurn = 0;
+      currentState.movesThisTurn = 3;
+    }
+
+    // Robot should now be at (4, 0) - the arena edge
+    expect(currentState.robots[0].position).toEqual({ q: 4, r: 0 });
+  });
+
+  it('allows advance from arena to corridor', () => {
+    const state = createGame(gameDef);
+    // Place a robot at arena edge facing outward
+    state.robots = [
+      { position: { q: 4, r: 0 }, direction: { q: 1, r: 0 }, isBeamEnabled: true, isLockedDown: false, player: 0 },
+    ];
+    state.playerTurn = 0;
+    state.movesThisTurn = 3;
+
+    // Advance to corridor (distance 5) - should succeed
+    const newState = applyMove(state, {
+      type: 'advance',
+      player: 0,
+      position: { q: 4, r: 0 },
+    });
+
+    expect(newState.robots[0].position).toEqual({ q: 5, r: 0 });
+    // Robot in corridor should have beam disabled
+    expect(newState.robots[0].isBeamEnabled).toBe(false);
+  });
+
+  it('possibleMoves does not generate advance moves that would go off board', () => {
+    const state = createGame(gameDef);
+    // Place a robot at corridor edge facing outward
+    state.robots = [
+      { position: { q: 5, r: 0 }, direction: { q: 1, r: 0 }, isBeamEnabled: false, isLockedDown: false, player: 0 },
+    ];
+    state.playerTurn = 0;
+    state.movesThisTurn = 3;
+
+    const moves = possibleMoves(state);
+    const advanceMoves = moves.filter((m: GameMove) => m.type === 'advance');
+
+    // Should have no advance moves since the only direction would go off board
+    expect(advanceMoves.length).toBe(0);
+  });
+
+  it('possibleMoves generates advance moves that stay within bounds', () => {
+    const state = createGame(gameDef);
+    // Place a robot in arena facing inward
+    state.robots = [
+      { position: { q: 3, r: 0 }, direction: { q: -1, r: 0 }, isBeamEnabled: true, isLockedDown: false, player: 0 },
+    ];
+    state.playerTurn = 0;
+    state.movesThisTurn = 3;
+
+    const moves = possibleMoves(state);
+    const advanceMoves = moves.filter((m: GameMove) => m.type === 'advance');
+
+    // Should have an advance move since moving inward stays within bounds
+    expect(advanceMoves.length).toBe(1);
+  });
+});

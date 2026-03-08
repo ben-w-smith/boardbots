@@ -37,6 +37,7 @@ export class GameSocket {
   private reconnectDelay: number;
   private baseUrl: string;
   private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+  private reconnectStatusTimeout: ReturnType<typeof setTimeout> | null = null;
   private _status: ConnectionStatus = 'disconnected';
   private wasEverConnected = false;
   private pingInterval: ReturnType<typeof setInterval> | null = null;
@@ -100,6 +101,11 @@ export class GameSocket {
     if (!this.ws) return;
 
     this.ws.onopen = () => {
+      // Clear any pending "reconnecting" status display
+      if (this.reconnectStatusTimeout) {
+        clearTimeout(this.reconnectStatusTimeout);
+        this.reconnectStatusTimeout = null;
+      }
       this.setStatus('connected');
       this.wasEverConnected = true;
       this.reconnectAttempts = 0;
@@ -190,7 +196,14 @@ export class GameSocket {
       return;
     }
 
-    this.setStatus('reconnecting');
+    // Delay showing "reconnecting" status to avoid flicker during brief disconnections
+    if (this.reconnectStatusTimeout) {
+      clearTimeout(this.reconnectStatusTimeout);
+    }
+    this.reconnectStatusTimeout = setTimeout(() => {
+      this.setStatus('reconnecting');
+    }, 500); // Only show "reconnecting" if connection is down for > 500ms
+
     this.reconnectAttempts++;
 
     this.reconnectTimeout = setTimeout(() => {
@@ -214,6 +227,10 @@ export class GameSocket {
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;
+    }
+    if (this.reconnectStatusTimeout) {
+      clearTimeout(this.reconnectStatusTimeout);
+      this.reconnectStatusTimeout = null;
     }
     this.reconnectAttempts = this.maxReconnectAttempts; // Prevent auto-reconnect
     this.wasEverConnected = false;

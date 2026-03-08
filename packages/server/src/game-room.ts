@@ -208,11 +208,8 @@ export class GameRoom {
       });
 
       this.saveState();
-      this.broadcast({
-        type: "playerJoined",
-        name: playerName,
-        index: existingPlayer.index,
-      });
+      // Don't broadcast playerJoined for reconnections - only for new players
+      // This prevents UI cycling of "joined the game" messages
       this.broadcastGameState();
       return;
     }

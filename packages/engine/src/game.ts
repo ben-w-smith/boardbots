@@ -10,7 +10,7 @@ import type {
   TransportRobot,
   TransportRobotEntry,
 } from "./types.js";
-import { pairDist, pairEq, pairKey, pairAdd, pairRotate } from "./hex.js";
+import { pairDist, pairEq, pairKey, pairAdd, pairRotate, inBounds } from "./hex.js";
 import { resolveMove } from "./resolution.js";
 
 /** Create a new game from a game definition */
@@ -196,6 +196,15 @@ function executeAdvance(
   // Check for blocking robot
   if (robotAt(state, advanceSpot)) {
     throw new Error("Cannot advance, another bot in the way");
+  }
+
+  // Check board boundaries - robot must stay within arena or corridor
+  const arenaRadius = state.gameDef.board.hexaBoard.arenaRadius;
+  const corridorRadius = arenaRadius + 1;
+  const advanceDist = pairDist(advanceSpot);
+
+  if (advanceDist > corridorRadius) {
+    throw new Error("Cannot advance off the board");
   }
 
   // Move the robot
