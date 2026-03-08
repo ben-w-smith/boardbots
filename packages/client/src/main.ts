@@ -358,7 +358,7 @@ socket.onGameOver((winner: number, winnerName: string) => {
 });
 
 socket.onPlayerJoined((name: string, _index: number) => {
-  console.log(`Player joined: ${name}`);
+  // Player joined: ${name}
   // The gameState broadcast will handle UI updates,
   // but this ensures we show status feedback immediately
   gameUI.setStatus("connected", `${name} joined the game`);

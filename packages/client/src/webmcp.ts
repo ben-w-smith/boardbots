@@ -147,12 +147,12 @@ export function initWebMCP(ctx: WebMCPContext): void {
   // Wait for webmcp to be available
   const checkAndInit = () => {
     if (!window.webmcp) {
-      console.log('WebMCP not available yet, retrying...');
+      // WebMCP not available yet, retrying...
       setTimeout(checkAndInit, 500);
       return;
     }
 
-    console.log('Initializing WebMCP integration...');
+    // Initializing WebMCP integration...
     registerTools();
     registerResources();
     registerPrompts();
