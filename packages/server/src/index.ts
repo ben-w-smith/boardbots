@@ -15,6 +15,7 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // Security headers
+// Note: HSTS and upgrade-insecure-requests disabled until HTTPS is configured
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -24,13 +25,12 @@ app.use(helmet({
       imgSrc: ["'self'", "data:", "https:"],
       connectSrc: ["'self'", "ws:", "wss:"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      // Explicitly remove upgrade-insecure-requests
+      upgradeInsecureRequests: null,
     },
   },
-  hsts: {
-    maxAge: 31536000,
-    includeSubDomains: true,
-    preload: true,
-  },
+  // Disable HSTS until HTTPS is configured
+  hsts: false,
 }));
 
 // CORS configuration
