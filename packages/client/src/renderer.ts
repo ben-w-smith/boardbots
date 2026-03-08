@@ -1,5 +1,5 @@
 import type { GameState, Pair, Robot } from "@lockitdown/engine";
-import { pairDist, pairEq } from "@lockitdown/engine";
+import { pairAdd, pairDist, pairEq, pairSub } from "@lockitdown/engine";
 import type { Animator } from "./animator.js";
 
 export interface RenderOptions {
@@ -336,24 +336,20 @@ export class BoardRenderer {
   }
 
   /** Draw beam line from robot in its facing direction */
-  private drawBeam(robot: Robot): void {
+  private drawBeam(robot: Robot, allRobots: Robot[], arenaRadius: number): void {
     const startPos = this.hexToPixel(robot.position.q, robot.position.r);
     const ctx = this.ctx;
 
-    // Calculate beam direction using shared utility
-    const angle = directionToAngle(robot.direction);
-
-    // Beam extends to edge of canvas
-    const beamLength = Math.max(this.canvas.width, this.canvas.height);
-    const endX = startPos.x + Math.cos(angle) * beamLength;
-    const endY = startPos.y + Math.sin(angle) * beamLength;
+    // Cast ray to find where beam stops (first robot or board edge)
+    const stopPosition = this.findBeamStopPosition(robot, allRobots, arenaRadius);
+    const endPixel = this.hexToPixel(stopPosition.q, stopPosition.r);
 
     // Determine beam color based on player
     const beamColor = robot.player === 0 ? "#00D4FF" : "#FF4444";
 
     ctx.beginPath();
     ctx.moveTo(startPos.x, startPos.y);
-    ctx.lineTo(endX, endY);
+    ctx.lineTo(endPixel.x, endPixel.y);
 
     ctx.strokeStyle = beamColor;
     ctx.lineWidth = 3;
@@ -364,6 +360,54 @@ export class BoardRenderer {
     ctx.shadowBlur = 10;
     ctx.stroke();
     ctx.shadowBlur = 0;
+
+    // Draw impact effect at stop position
+    this.drawBeamImpact(endPixel.x, endPixel.y);
+  }
+
+  /** Find the position where the beam stops (first obstacle or boundary) */
+  private findBeamStopPosition(
+    sourceRobot: Robot,
+    allRobots: Robot[],
+    arenaRadius: number,
+  ): Pair {
+    const direction = sourceRobot.direction;
+    const boundary = arenaRadius + 1; // Include corridor
+    let currentPos = pairAdd(sourceRobot.position, direction);
+
+    // Step through hexes along the beam direction
+    while (pairDist(currentPos) <= boundary) {
+      // Check if a robot is at this position (excluding the source robot)
+      const robotAtPos = allRobots.find(
+        (r) => pairEq(r.position, currentPos) && !pairEq(r.position, sourceRobot.position),
+      );
+      if (robotAtPos) {
+        return currentPos;
+      }
+      // Move to next hex in direction
+      currentPos = pairAdd(currentPos, direction);
+    }
+
+    // Beam stopped at boundary - return the last valid position
+    return pairSub(currentPos, direction);
+  }
+
+  /** Draw impact effect at beam stop point */
+  private drawBeamImpact(x: number, y: number): void {
+    const ctx = this.ctx;
+    const impactRadius = this.hexSize * 0.3;
+
+    // Outer glow
+    ctx.beginPath();
+    ctx.arc(x, y, impactRadius * 1.5, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(255, 255, 100, 0.3)";
+    ctx.fill();
+
+    // Inner bright core
+    ctx.beginPath();
+    ctx.arc(x, y, impactRadius * 0.7, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(255, 255, 200, 0.7)";
+    ctx.fill();
   }
 
   /** Draw highlight on a hex */
@@ -479,7 +523,7 @@ export class BoardRenderer {
     // Draw beams for robots with enabled beams
     for (const robot of state.robots) {
       if (robot.isBeamEnabled && !robot.isLockedDown) {
-        this.drawBeam(robot);
+        this.drawBeam(robot, state.robots, state.gameDef.board.hexaBoard.arenaRadius);
       }
     }
 
