@@ -11,3 +11,13 @@ test-results/
 
 # AI agent orchestration files
 .agent/
+
+# Git worktrees
+.worktrees/
+
+# Playwright MCP
+.playwright-mcp/
+
+# Test/debug screenshots
+*.png
+!board-landscape.png

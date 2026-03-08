@@ -237,3 +237,4 @@ The production site uses Cloudflare for DNS and SSL termination:
 |------|--------|
 | 2026-03-08 | Added Cloudflare DNS and SSL for boardbots.benwsmith.com |
 | 2026-03-07 | Initial deployment to DigitalOcean |
+| 2026-03-08 | Added spaceship design, space background, laser impacts, and various bug fixes (connection cycling, board boundaries, robot selection sync) |
