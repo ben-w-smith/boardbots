@@ -37,14 +37,24 @@ export class InputHandler {
   /** Update the current game state */
   setGameState(state: GameState): void {
     this.gameState = state;
-    // Reset selection if game state changed significantly
+    // Keep selection if robot still exists (update reference to new state)
     if (this.state.selectedRobot) {
-      const robotStillExists = state.robots.some(
+      // Find the robot by player and check both current position and potential advance position
+      const selectedRobot = this.state.selectedRobot;
+      const robotStillExists = state.robots.find(
         (r) =>
-          pairEq(r.position, this.state.selectedRobot!.position) &&
-          r.player === this.state.selectedRobot!.player,
+          r.player === selectedRobot.player &&
+          (pairEq(r.position, selectedRobot.position) ||
+           // Check if robot advanced from the selected position
+           pairEq(r.position, pairAdd(selectedRobot.position, selectedRobot.direction))),
       );
-      if (!robotStillExists) {
+      if (robotStillExists) {
+        // Update the selected robot reference to the new state
+        this.state = {
+          ...this.state,
+          selectedRobot: robotStillExists,
+        };
+      } else {
         this.resetSelection();
         return;
       }
