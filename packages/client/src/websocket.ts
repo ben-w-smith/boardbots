@@ -6,7 +6,7 @@ declare const __PRODUCTION_API_URL__: string;
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'reconnecting';
 
 export interface ServerMessage {
-  type: 'gameState' | 'error' | 'playerJoined' | 'playerLeft' | 'gameOver';
+  type: 'gameState' | 'error' | 'playerJoined' | 'playerLeft' | 'gameOver' | 'pong';
   state?: TransportState | null;
   players?: string[];
   phase?: string;
@@ -38,6 +38,8 @@ export class GameSocket {
   private baseUrl: string;
   private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   private _status: ConnectionStatus = 'disconnected';
+  private wasEverConnected = false;
+  private pingInterval: ReturnType<typeof setInterval> | null = null;
 
   // Callbacks
   private onStateUpdateCallback: ((state: TransportState | null, players: string[], phase: string, aiEnabled?: boolean, aiPlayerIndex?: number) => void) | null = null;
@@ -99,14 +101,22 @@ export class GameSocket {
 
     this.ws.onopen = () => {
       this.setStatus('connected');
+      this.wasEverConnected = true;
       this.reconnectAttempts = 0;
       // Send join message
       this.send({ type: 'join', playerName: this.playerName });
+      // Start ping to keep connection alive
+      this.startPing();
     };
 
     this.ws.onclose = (_event) => {
+      this.stopPing();
       if (this._status !== 'disconnected') {
-        this.setStatus('disconnected');
+        // Only show disconnected status if we never connected
+        // Otherwise, silently reconnect to avoid UI flicker
+        if (!this.wasEverConnected) {
+          this.setStatus('disconnected');
+        }
         this.scheduleReconnect();
       }
     };
@@ -123,6 +133,21 @@ export class GameSocket {
         this.onErrorCallback?.('Invalid message from server');
       }
     };
+  }
+
+  private startPing(): void {
+    this.stopPing();
+    // Send ping every 30 seconds to keep connection alive
+    this.pingInterval = setInterval(() => {
+      this.send({ type: 'ping' });
+    }, 30000);
+  }
+
+  private stopPing(): void {
+    if (this.pingInterval) {
+      clearInterval(this.pingInterval);
+      this.pingInterval = null;
+    }
   }
 
   private handleMessage(msg: ServerMessage): void {
@@ -151,6 +176,9 @@ export class GameSocket {
         if (msg.winner !== undefined && msg.winnerName) {
           this.onGameOverCallback?.(msg.winner, msg.winnerName);
         }
+        break;
+      case 'pong':
+        // Ignore pong responses - just for keepalive
         break;
     }
   }
@@ -182,11 +210,13 @@ export class GameSocket {
 
   /** Disconnect from the game */
   disconnect(): void {
+    this.stopPing();
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;
     }
     this.reconnectAttempts = this.maxReconnectAttempts; // Prevent auto-reconnect
+    this.wasEverConnected = false;
     if (this.ws) {
       this.ws.close();
       this.ws = null;

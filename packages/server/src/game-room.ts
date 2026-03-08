@@ -43,7 +43,8 @@ type ClientMessage =
   | { type: "startGame" }
   | { type: "startAIGame"; aiDepth: number }
   | { type: "rematch" }
-  | { type: "requestAI" };
+  | { type: "requestAI" }
+  | { type: "ping" };
 
 // Server -> Client messages
 type ServerMessage =
@@ -58,7 +59,8 @@ type ServerMessage =
   | { type: "error"; message: string }
   | { type: "playerJoined"; name: string; index: number }
   | { type: "playerLeft"; name: string }
-  | { type: "gameOver"; winner: number; winnerName: string };
+  | { type: "gameOver"; winner: number; winnerName: string }
+  | { type: "pong" };
 
 // WebSocket attachment for player info
 interface WSAttachment {
@@ -148,6 +150,9 @@ export class GameRoom {
         break;
       case "requestAI":
         await this.handleRequestAI(ws);
+        break;
+      case "ping":
+        this.sendTo(ws, { type: "pong" });
         break;
       default:
         this.sendTo(ws, { type: "error", message: "Unknown message type" });
