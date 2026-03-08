@@ -1,0 +1,26 @@
+# Production docker-compose for DigitalOcean Droplet
+# Usage: Replace ${IMAGE_NAME} with your actual Docker image
+# Example: export IMAGE_NAME=docker.io/youruser/boardbots:latest
+
+version: '3.8'
+
+services:
+  boardbots:
+    image: ${IMAGE_NAME:-boardbots:latest}
+    container_name: boardbots
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_PATH=/app/data/boardbots.db
+    volumes:
+      # Mount volume for SQLite persistence
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

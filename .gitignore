@@ -8,3 +8,6 @@ packages/*/dist/
 playwright-report/
 test-results/
 *.db
+
+# AI agent orchestration files
+.agent/

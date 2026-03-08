@@ -8,26 +8,27 @@ A multiplayer board game implemented as a TypeScript monorepo.
 packages/
   engine/   # Pure game logic (hex grid, moves, beam resolution, AI)
   client/   # Vite SPA (canvas renderer, lobby UI, game UI, WebSocket client)
-  server/   # Cloudflare Worker + Durable Object (game rooms, WebSocket server)
+  server/   # Node.js + Express (game rooms, WebSocket server, SQLite)
 ```
 
 ## Tech Stack
 
 - **TypeScript** (strict mode)
-- **pnpm workspaces** - monorepo management
+- **npm workspaces** - monorepo management
 - **Vite 7.x** - client bundling
-- **Wrangler 3.x** - Cloudflare Workers/DO deployment
+- **Express 4.x** - HTTP server
+- **ws** - WebSocket server
+- **better-sqlite3** - persistent storage
 - **Vitest** - testing
-- **Cloudflare Durable Objects** - stateful game rooms
 
 ## Architecture
 
 ```
 +----------------+     WebSocket      +------------------+
-|  Client (Vite) | <----------------> | Server (Worker + |
-|  - Canvas UI   |                    | Durable Object)  |
-|  - Game state  |                    | - Game rooms     |
-+----------------+                    | - WebSocket srv  |
+|  Client (Vite) | <----------------> | Server (Node.js) |
+|  - Canvas UI   |                    | - Express HTTP   |
+|  - Game state  |                    | - ws WebSocket   |
++----------------+                    | - SQLite DB      |
          |                            +------------------+
          |                                    |
          v                                    v
@@ -41,27 +42,28 @@ packages/
 - Engine is pure logic with no I/O dependencies
 - Client and Server both depend on Engine
 - Server holds authoritative game state and broadcasts updates
+- SQLite persists active game rooms
 
 ## Common Commands
 
 ```bash
+# Install dependencies
+npm install
+
 # Start client dev server
 npm run dev
+
+# Start server dev mode (with hot reload)
+npm run dev --workspace=packages/server
 
 # Run all tests
 npm run test --workspaces --if-present
 
-# Build client for production
-npm run build --workspace=packages/client
+# Build all packages for production
+npm run build
 
-# Start backend locally (port 8787)
-cd packages/server && npx wrangler dev --port 8787
-
-# Deploy server to Cloudflare
-cd packages/server && npx wrangler deploy
-
-# Build engine (required before client/server can import it)
-npm run build --workspace=packages/engine
+# Start server in production mode
+npm run start --workspace=packages/server
 ```
 
 ## Package Dependencies
@@ -74,5 +76,11 @@ npm run build --workspace=packages/engine
 ## Development Notes
 
 - Engine must be built before client/server can import it
-- Server uses Cloudflare Durable Objects for stateful game rooms
+- Server uses in-memory RoomManager for active game rooms with SQLite persistence
 - Client connects via WebSocket to server for real-time gameplay
+
+## Deployment
+
+See [deploy/README.md](deploy/README.md) for DigitalOcean deployment instructions.
+
+**Production:** http://138.197.0.105 (~$6/month on DigitalOcean)

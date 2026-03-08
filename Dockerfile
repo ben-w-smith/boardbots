@@ -19,8 +19,10 @@ COPY packages/engine ./packages/engine
 COPY packages/client ./packages/client
 COPY packages/server ./packages/server
 
-# Build all packages
-RUN npm run build
+# Build packages in correct order (engine first, then server/client)
+RUN npm run build --workspace=packages/engine && \
+    npm run build --workspace=packages/server && \
+    npm run build --workspace=packages/client
 
 # Stage 2: Runtime
 FROM node:22-alpine AS runner
