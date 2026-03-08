@@ -5,7 +5,7 @@ export default defineConfig({
     proxy: {
       // Proxy API and WebSocket requests to Wrangler dev server
       "/api": {
-        target: "http://127.0.0.1:8787",
+        target: "http://127.0.0.1:3000",
         changeOrigin: true,
         ws: true,
       },
@@ -13,9 +13,7 @@ export default defineConfig({
   },
   define: {
     __PRODUCTION_API_URL__: JSON.stringify(
-      process.env.NODE_ENV === "production"
-        ? "lockitdown-server.benwsmith.workers.dev"
-        : "",
+      process.env.NODE_ENV === "production" ? "" : "",
     ),
   },
 });

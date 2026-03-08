@@ -1,84 +1,76 @@
-import { GameRoom } from './game-room.js';
+import express from "express";
+import { createServer } from "http";
+import { WebSocketServer } from "ws";
+import cors from "cors";
+import * as path from "path";
+import { fileURLToPath } from "url";
+import { RoomManager } from "./RoomManager.js";
 
-export { GameRoom };
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-export interface Env {
-  GAME_ROOM: DurableObjectNamespace;
-}
+const app = express();
+const port = process.env.PORT || 3000;
 
-// CORS headers for cross-origin API access
-const CORS_HEADERS: Record<string, string> = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-};
+app.use(cors());
+app.use(express.json());
 
-// Helper to add CORS headers to any response
-function corsResponse(body: BodyInit | null, init: ResponseInit = {}): Response {
-  return new Response(body, {
-    ...init,
-    headers: { ...CORS_HEADERS, ...init.headers },
-  });
-}
+const clientDistPath = path.join(__dirname, "../../client/dist");
+app.use(express.static(clientDistPath));
 
-// Generate a random 6-character alphanumeric game code (uppercase, no confusing chars)
+// Helper to generate a random 6-character alphanumeric game code
 function generateGameCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // No I, O, 0, 1
-  let code = '';
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
   for (let i = 0; i < 6; i++) {
     code += chars[Math.floor(Math.random() * chars.length)];
   }
   return code;
 }
 
-export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
-    const url = new URL(request.url);
+// Health check
+app.get("/api/health", (req, res) => {
+  res.send("OK");
+});
 
-    // Handle CORS preflight for all API routes
-    if (request.method === 'OPTIONS') {
-      return corsResponse(null, { status: 204 });
+// Create a new game lobby
+app.post("/api/lobby/create", (req, res) => {
+  const gameCode = generateGameCode();
+  res.json({ gameCode });
+});
+
+// SPA routing fallback
+app.get("*", (req, res) => {
+  res.sendFile(path.join(clientDistPath, "index.html"));
+});
+
+// Create HTTP server
+const server = createServer(app);
+
+// Create WebSocket server
+const wss = new WebSocketServer({ noServer: true });
+
+// Handle WebSocket upgrade
+server.on("upgrade", (request, socket, head) => {
+  const url = new URL(request.url || "", `http://${request.headers.host}`);
+  const pathname = url.pathname;
+
+  if (pathname.startsWith("/api/game/")) {
+    const gameCode = pathname.replace("/api/game/", "").toUpperCase().trim();
+
+    if (!gameCode || gameCode.length !== 6) {
+      socket.destroy();
+      return;
     }
 
-    // Health check
-    if (url.pathname === '/api/health') {
-      return corsResponse('OK', { status: 200 });
-    }
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      RoomManager.getInstance().handleConnection(gameCode, ws);
+    });
+  } else {
+    socket.destroy();
+  }
+});
 
-    // Create a new game lobby
-    if (url.pathname === '/api/lobby/create' && request.method === 'POST') {
-      // Generate a short, human-readable game code
-      const gameCode = generateGameCode();
-      // The GameRoom DO will be created on first WebSocket connection
-      return corsResponse(JSON.stringify({ gameCode }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    // WebSocket upgrade for game connection
-    if (url.pathname.startsWith('/api/game/') && request.method === 'GET') {
-      // Normalize game code: uppercase and trim
-      let gameCode = url.pathname.replace('/api/game/', '').toUpperCase().trim();
-
-      if (!gameCode || gameCode.length !== 6) {
-        return new Response('Invalid game code', { status: 400 });
-      }
-
-      // Upgrade to WebSocket
-      const upgradeHeader = request.headers.get('Upgrade');
-      if (upgradeHeader !== 'websocket') {
-        return new Response('Expected WebSocket', { status: 426 });
-      }
-
-      // Get the Durable Object stub using the normalized game code
-      const id = env.GAME_ROOM.idFromName(gameCode);
-      const stub = env.GAME_ROOM.get(id);
-
-      // Forward the WebSocket upgrade to the Durable Object
-      return stub.fetch(request);
-    }
-
-    return new Response('Not Found', { status: 404 });
-  },
-};
+server.listen(port, () => {
+  console.log(`Server listening on port ${port}`);
+});
