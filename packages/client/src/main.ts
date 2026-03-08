@@ -216,6 +216,7 @@ socket.onStateUpdate(
       detectAndAnimateChanges();
 
       inputHandler.setGameState(state);
+      inputState = inputHandler.getState(); // Sync global inputState with updated selection
       gameUI.updateFromTransport(transportState, players, phase, aiEnabled, aiPlayerIndex);
     }
 
