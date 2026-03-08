@@ -282,6 +282,9 @@ function detectAndAnimateChanges(): void {
       animator.animateDestruction(robot.position, color, (q, r) =>
         renderer.getPixelFromHex(q, r),
       );
+      // Play laser hit and destruction sounds
+      audioManager.playLaserHitSound();
+      setTimeout(() => audioManager.playRobotDestroyedSound(), 50);
     }
   }
 
@@ -302,6 +305,7 @@ function detectAndAnimateChanges(): void {
         if (movedFromPrev) {
           // Robot advanced - trigger advance animation
           animator.animateAdvance(prevKey, prevR.position, robot.position);
+          audioManager.playMoveSound();
           break;
         }
       }
@@ -321,12 +325,15 @@ function detectAndAnimateChanges(): void {
       if (Math.abs(prevAngle - currAngle) > 0.1) {
         // Robot turned - trigger turn animation
         animator.animateTurn(key, prevAngle, currAngle);
+        audioManager.playMoveSound();
       }
 
       // Check for lock status change
       if (!prevRobot.isLockedDown && robot.isLockedDown) {
         // Robot just got locked - trigger flash
         animator.animateLockFlash(key);
+        // Play lock sound
+        audioManager.playRobotLockedSound();
       }
     }
   }

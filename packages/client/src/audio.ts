@@ -150,6 +150,104 @@ export class AudioManager {
   }
 
   /**
+   * Play a laser/beam hit sound - sharp electronic zap
+   */
+  playLaserHitSound(): void {
+    if (this.isMuted || !this.audioContext) return;
+
+    this.ensureAudioContext();
+
+    const now = this.audioContext.currentTime;
+    const oscillator = this.audioContext.createOscillator();
+    const gainNode = this.audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(this.audioContext.destination);
+
+    // High-pitched zap that drops quickly
+    oscillator.type = 'square';
+    oscillator.frequency.setValueAtTime(1200, now);
+    oscillator.frequency.exponentialRampToValueAtTime(200, now + 0.15);
+
+    gainNode.gain.setValueAtTime(0, now);
+    gainNode.gain.linearRampToValueAtTime(this.masterVolume * 0.4, now + 0.01);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+
+    oscillator.start(now);
+    oscillator.stop(now + 0.15);
+  }
+
+  /**
+   * Play a robot destroyed sound - explosion/crash
+   */
+  playRobotDestroyedSound(): void {
+    if (this.isMuted || !this.audioContext) return;
+
+    this.ensureAudioContext();
+
+    const now = this.audioContext.currentTime;
+
+    // Layer two oscillators for a more complex destruction sound
+    const oscillator1 = this.audioContext.createOscillator();
+    const oscillator2 = this.audioContext.createOscillator();
+    const gainNode = this.audioContext.createGain();
+
+    oscillator1.connect(gainNode);
+    oscillator2.connect(gainNode);
+    gainNode.connect(this.audioContext.destination);
+
+    // Low rumble
+    oscillator1.type = 'sawtooth';
+    oscillator1.frequency.setValueAtTime(100, now);
+    oscillator1.frequency.exponentialRampToValueAtTime(40, now + 0.25);
+
+    // Higher crunchy layer
+    oscillator2.type = 'square';
+    oscillator2.frequency.setValueAtTime(200, now);
+    oscillator2.frequency.exponentialRampToValueAtTime(50, now + 0.2);
+
+    gainNode.gain.setValueAtTime(0, now);
+    gainNode.gain.linearRampToValueAtTime(this.masterVolume * 0.5, now + 0.02);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+
+    oscillator1.start(now);
+    oscillator2.start(now);
+    oscillator1.stop(now + 0.25);
+    oscillator2.stop(now + 0.25);
+  }
+
+  /**
+   * Play a robot locked sound - mechanical containment
+   */
+  playRobotLockedSound(): void {
+    if (this.isMuted || !this.audioContext) return;
+
+    this.ensureAudioContext();
+
+    const now = this.audioContext.currentTime;
+
+    // Double-click mechanical sound
+    for (let i = 0; i < 2; i++) {
+      const startTime = now + i * 0.08;
+      const oscillator = this.audioContext.createOscillator();
+      const gainNode = this.audioContext.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(this.audioContext.destination);
+
+      oscillator.type = 'triangle';
+      oscillator.frequency.setValueAtTime(600, startTime);
+
+      gainNode.gain.setValueAtTime(0, startTime);
+      gainNode.gain.linearRampToValueAtTime(this.masterVolume * 0.35, startTime + 0.01);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + 0.06);
+
+      oscillator.start(startTime);
+      oscillator.stop(startTime + 0.06);
+    }
+  }
+
+  /**
    * Toggle mute state
    */
   toggleMute(): boolean {

@@ -34,8 +34,21 @@ app.use(helmet({
 }));
 
 // CORS configuration
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://138.197.0.105",
+  "http://boardbots.benwsmith.com",
+  "https://boardbots.benwsmith.com",
+];
+
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || "http://localhost:5173",
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
   credentials: true,
 }));
 

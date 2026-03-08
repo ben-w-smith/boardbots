@@ -8,13 +8,15 @@
 
 | Item | Value |
 |------|-------|
-| **URL** | http://138.197.0.105 |
+| **URL** | https://boardbots.benwsmith.com |
+| **IP URL** | http://138.197.0.105 |
 | **Provider** | DigitalOcean |
 | **Region** | NYC3 (New York) |
 | **Size** | s-1vcpu-1gb (1GB RAM, 1 vCPU) |
 | **Cost** | $6/month |
 | **OS** | Ubuntu 24.04 LTS |
 | **Droplet ID** | 556702156 |
+| **DNS/SSL** | Cloudflare (Universal SSL) |
 
 ---
 
@@ -32,11 +34,21 @@
 ## Architecture
 
 ```
+                              ┌─────────────────────────────────────┐
+                              │           Cloudflare                │
+                              │    (DNS + SSL Termination)          │
+                              │                                     │
+    User Browser ──HTTPS────►│  boardbots.benwsmith.com            │
+                              │       │                             │
+                              │       │ (HTTP to origin)            │
+                              └───────┼─────────────────────────────┘
+                                      │
+                                      ▼
                     ┌─────────────────────────────────────┐
                     │           DigitalOcean              │
                     │         Droplet (NYC3)              │
                     │                                     │
-    Internet ──────►│  Nginx (80/443)                     │
+                    │  Nginx (80)                         │
                     │       │                             │
                     │       ▼                             │
                     │  Docker Container                   │
@@ -157,20 +169,26 @@ ssh root@138.197.0.105 'cd /opt/boardbots && docker compose down && cp backups/b
 
 ---
 
-## SSL/HTTPS Setup (Optional)
+## SSL/HTTPS Setup
 
-If you have a domain pointing to the droplet:
+The production site uses Cloudflare for DNS and SSL termination:
 
-```bash
-# Point your domain's A record to 138.197.0.105
-# Then run:
-ssh root@138.197.0.105 'certbot --nginx -d yourdomain.com'
+- **Domain:** `boardbots.benwsmith.com`
+- **DNS:** Cloudflare (proxied, orange cloud)
+- **SSL Mode:** Flexible (Cloudflare terminates HTTPS, connects to origin via HTTP)
+- **Certificate:** Cloudflare Universal SSL (covers `*.benwsmith.com`)
 
-# Certbot will automatically:
-# 1. Obtain Let's Encrypt certificate
-# 2. Configure Nginx for HTTPS
-# 3. Set up auto-renewal
-```
+### DNS Configuration
+
+| Type | Name | Content | Proxied |
+|------|------|---------|---------|
+| A | boardbots | 138.197.0.105 | Yes |
+
+### Important Notes
+
+- Use 2-level subdomains (e.g., `boardbots.benwsmith.com`) for Universal SSL coverage
+- 3-level subdomains (e.g., `dev.boardbots.benwsmith.com`) are NOT covered by Universal SSL
+- For multi-level subdomains, enable Total TLS or use Advanced Certificates
 
 ---
 
@@ -217,4 +235,5 @@ ssh root@138.197.0.105 'certbot --nginx -d yourdomain.com'
 
 | Date | Change |
 |------|--------|
+| 2026-03-08 | Added Cloudflare DNS and SSL for boardbots.benwsmith.com |
 | 2026-03-07 | Initial deployment to DigitalOcean |
