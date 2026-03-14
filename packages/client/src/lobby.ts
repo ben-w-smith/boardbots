@@ -166,6 +166,11 @@ export class LobbyUI {
     const authState = authManager.getState();
     const isAuthenticated = authState.isAuthenticated;
 
+    // For authenticated users, use their username
+    if (isAuthenticated && authState.user) {
+      this.playerName = authState.user.username;
+    }
+
     // For logged-in users: show full game creation options
     // For guests: show new full-width landing page
     if (isAuthenticated && authState.user) {

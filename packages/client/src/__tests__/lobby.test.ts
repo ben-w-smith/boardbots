@@ -1,10 +1,19 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import {
   LobbyUI,
   getSavedPlayerName,
   savePlayerName,
   parseGameCode,
 } from '../lobby.js';
+import { authManager } from '../auth.js';
+
+// Mock authManager
+vi.mock('../auth.js', () => ({
+  authManager: {
+    getState: vi.fn(() => ({ isAuthenticated: false, user: null })),
+    getUser: vi.fn(() => null),
+  },
+}));
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -31,6 +40,11 @@ function createMockContainer(): HTMLElement {
   container.id = 'app';
   document.body.appendChild(container);
   return container;
+}
+
+// Helper to clean up DOM
+function cleanupDOM() {
+  document.body.innerHTML = '';
 }
 
 describe('Lobby', () => {
@@ -86,6 +100,8 @@ describe('LobbyUI', () => {
   let joinGameCalls: { gameCode: string; playerName: string }[];
 
   beforeEach(() => {
+    vi.mocked(authManager.getState).mockReturnValue({ isAuthenticated: false, user: null });
+    vi.mocked(authManager.getUser).mockReturnValue(null);
     container = createMockContainer();
     createGameCalls = [];
     joinGameCalls = [];
@@ -102,26 +118,38 @@ describe('LobbyUI', () => {
     });
   });
 
+  afterEach(() => {
+    cleanupDOM();
+    vi.clearAllMocks();
+  });
+
   describe('constructor', () => {
     it('creates a LobbyUI instance', () => {
       expect(lobbyUI).toBeInstanceOf(LobbyUI);
     });
 
-    it('renders the landing page by default', () => {
-      const title = container.querySelector('.lobby-title');
-      expect(title?.textContent).toBe('Lock It Down');
+    it('renders the landing page by default with title Lock It Down', () => {
+      // Guest landing uses landing-title, authenticated uses lobby-title
+      const landingTitle = container.querySelector('.landing-title');
+      const lobbyTitle = container.querySelector('.lobby-title');
+      expect(landingTitle?.textContent || lobbyTitle?.textContent).toBe('Lock It Down');
     });
 
-    it('shows create and join buttons', () => {
-      const btnCreate = container.querySelector('#btn-create');
-      const btnJoin = container.querySelector('#btn-join');
-      expect(btnCreate).not.toBeNull();
-      expect(btnJoin).not.toBeNull();
+    it('shows login and register buttons on guest landing page', () => {
+      const btnLogin = container.querySelector('#btn-login');
+      const btnRegister = container.querySelector('#btn-register');
+      expect(btnLogin).not.toBeNull();
+      expect(btnRegister).not.toBeNull();
     });
 
-    it('shows player name input', () => {
+    it('shows game code input for guest join', () => {
+      const codeInput = container.querySelector('#game-code');
+      expect(codeInput).not.toBeNull();
+    });
+
+    it('does NOT show player name input on guest landing page', () => {
       const nameInput = container.querySelector('#player-name');
-      expect(nameInput).not.toBeNull();
+      expect(nameInput).toBeNull();
     });
   });
 
@@ -140,49 +168,146 @@ describe('LobbyUI', () => {
     });
   });
 
-  describe('landing page', () => {
-    it('shows error when name is empty', () => {
-      const btnCreate = container.querySelector('#btn-create') as HTMLButtonElement;
-      btnCreate?.click();
+  describe('guest landing page', () => {
+    it('calls onLogin when login button is clicked', () => {
+      cleanupDOM();
+      container = createMockContainer();
+      const onLogin = vi.fn();
+      const newLobbyUI = new LobbyUI({
+        container,
+        onCreateGame: async () => 'TEST99',
+        onJoinGame: () => {},
+        onLogin,
+      });
 
-      const errorEl = container.querySelector('.lobby-error');
-      expect(errorEl?.textContent).toContain('enter your name');
+      const btnLogin = container.querySelector('#btn-login') as HTMLButtonElement;
+      btnLogin?.click();
+
+      expect(onLogin).toHaveBeenCalled();
     });
 
-    it('transitions to create mode with valid name', async () => {
-      const nameInput = container.querySelector('#player-name') as HTMLInputElement;
-      nameInput.value = 'TestPlayer';
-      nameInput.dispatchEvent(new Event('input'));
+    it('calls onRegister when register button is clicked', () => {
+      cleanupDOM();
+      container = createMockContainer();
+      const onRegister = vi.fn();
+      const newLobbyUI = new LobbyUI({
+        container,
+        onCreateGame: async () => 'TEST99',
+        onJoinGame: () => {},
+        onRegister,
+      });
 
-      const btnCreate = container.querySelector('#btn-create') as HTMLButtonElement;
-      btnCreate?.click();
+      const btnRegister = container.querySelector('#btn-register') as HTMLButtonElement;
+      btnRegister?.click();
 
-      // Wait for async create
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(onRegister).toHaveBeenCalled();
+    });
 
-      expect(createGameCalls.length).toBe(1);
-      expect(createGameCalls[0]?.playerName).toBe('TestPlayer');
+    it('generates guest name and joins game when join clicked with valid code', () => {
+      const codeInput = container.querySelector('#game-code') as HTMLInputElement;
+      codeInput.value = 'AB3K9X';
+
+      const btnJoin = container.querySelector('#btn-join') as HTMLButtonElement;
+      btnJoin?.click();
+
+      expect(joinGameCalls.length).toBe(1);
+      expect(joinGameCalls[0]?.gameCode).toBe('AB3K9X');
+      expect(joinGameCalls[0]?.playerName).toMatch(/^Guest_/);
+    });
+
+    it('shows error for invalid game code', () => {
+      const codeInput = container.querySelector('#game-code') as HTMLInputElement;
+      codeInput.value = 'invalid';
+
+      const btnJoin = container.querySelector('#btn-join') as HTMLButtonElement;
+      btnJoin?.click();
+
+      const errorEl = container.querySelector('.lobby-error');
+      expect(errorEl?.textContent).toContain('Invalid game code');
+    });
+  });
+
+  describe('authenticated landing page', () => {
+    beforeEach(() => {
+      cleanupDOM();
+      vi.mocked(authManager.getState).mockReturnValue({
+        isAuthenticated: true,
+        user: { username: 'testuser' },
+      });
+      vi.mocked(authManager.getUser).mockReturnValue({ username: 'testuser' } as any);
+
+      container = createMockContainer();
+      createGameCalls = [];
+      joinGameCalls = [];
+
+      lobbyUI = new LobbyUI({
+        container,
+        onCreateGame: async (playerName: string) => {
+          createGameCalls.push({ playerName });
+          return 'TEST99';
+        },
+        onJoinGame: (gameCode: string, playerName: string) => {
+          joinGameCalls.push({ gameCode, playerName });
+        },
+        onCreateAIGame: async (playerName: string, aiDepth: number) => {
+          return 'AI99';
+        },
+      });
+    });
+
+    afterEach(() => {
+      cleanupDOM();
+    });
+
+    it('shows create, vs AI, and join buttons when authenticated', () => {
+      const btnCreate = container.querySelector('#btn-create');
+      const btnVsAI = container.querySelector('#btn-vs-ai');
+      const btnJoin = container.querySelector('#btn-join');
+      expect(btnCreate).not.toBeNull();
+      expect(btnVsAI).not.toBeNull();
+      expect(btnJoin).not.toBeNull();
     });
 
     it('transitions to join mode when join button clicked', () => {
-      const nameInput = container.querySelector('#player-name') as HTMLInputElement;
-      nameInput.value = 'TestPlayer';
-      nameInput.dispatchEvent(new Event('input'));
-
       const btnJoin = container.querySelector('#btn-join') as HTMLButtonElement;
       btnJoin?.click();
 
       const title = container.querySelector('.lobby-title');
       expect(title?.textContent).toBe('Join Game');
     });
+
+    it('shows difficulty selector for AI games', () => {
+      const difficultyBtns = container.querySelectorAll('.difficulty-btn');
+      expect(difficultyBtns.length).toBe(3);
+    });
   });
 
-  describe('join screen', () => {
+  describe('join screen (authenticated)', () => {
     beforeEach(() => {
-      // Navigate to join screen
-      const nameInput = container.querySelector('#player-name') as HTMLInputElement;
-      nameInput.value = 'TestPlayer';
-      nameInput.dispatchEvent(new Event('input'));
+      cleanupDOM();
+      // Set up authenticated state
+      vi.mocked(authManager.getState).mockReturnValue({
+        isAuthenticated: true,
+        user: { username: 'testuser' },
+      });
+      vi.mocked(authManager.getUser).mockReturnValue({ username: 'testuser' } as any);
+
+      container = createMockContainer();
+      createGameCalls = [];
+      joinGameCalls = [];
+
+      lobbyUI = new LobbyUI({
+        container,
+        onCreateGame: async (playerName: string) => {
+          createGameCalls.push({ playerName });
+          return 'TEST99';
+        },
+        onJoinGame: (gameCode: string, playerName: string) => {
+          joinGameCalls.push({ gameCode, playerName });
+        },
+      });
+
+      // Click join button to go to join screen
       const btnJoin = container.querySelector('#btn-join') as HTMLButtonElement;
       btnJoin?.click();
     });
@@ -223,7 +348,7 @@ describe('LobbyUI', () => {
 
       expect(joinGameCalls.length).toBe(1);
       expect(joinGameCalls[0]?.gameCode).toBe('AB3K9X');
-      expect(joinGameCalls[0]?.playerName).toBe('TestPlayer');
+      expect(joinGameCalls[0]?.playerName).toBe('testuser');
     });
 
     it('auto-formats URL paste to code', () => {
@@ -270,8 +395,10 @@ describe('LobbyUI', () => {
     it('renders landing mode', () => {
       lobbyUI.setMode('create');
       lobbyUI.setMode('landing');
-      const title = container.querySelector('.lobby-title');
-      expect(title?.textContent).toBe('Lock It Down');
+      // Guest landing uses landing-title
+      const landingTitle = container.querySelector('.landing-title');
+      const lobbyTitle = container.querySelector('.lobby-title');
+      expect(landingTitle?.textContent || lobbyTitle?.textContent).toBe('Lock It Down');
     });
   });
 

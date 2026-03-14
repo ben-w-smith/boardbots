@@ -11,6 +11,7 @@ export interface GameHistoryItem {
   createdAt: number;
   winnerId: number | null;
   aiEnabled: boolean;
+  status?: 'active' | 'cancelled' | 'completed' | 'archived';
 }
 
 export interface GameHistoryResponse {
@@ -134,4 +135,43 @@ export function getGameResult(
     return 'win';
   }
   return 'loss';
+}
+
+/**
+ * Cancel a game
+ */
+export async function cancelGame(gameCode: string): Promise<void> {
+  const response = await authManager.authFetch(`/api/games/${gameCode}/cancel`, {
+    method: 'POST',
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to cancel game: ${response.statusText}`);
+  }
+}
+
+/**
+ * Archive a game
+ */
+export async function archiveGame(gameCode: string): Promise<void> {
+  const response = await authManager.authFetch(`/api/games/${gameCode}/archive`, {
+    method: 'POST',
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to archive game: ${response.statusText}`);
+  }
+}
+
+/**
+ * Unarchive a game
+ */
+export async function unarchiveGame(gameCode: string): Promise<void> {
+  const response = await authManager.authFetch(`/api/games/${gameCode}/unarchive`, {
+    method: 'POST',
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to unarchive game: ${response.statusText}`);
+  }
 }
