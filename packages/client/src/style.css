@@ -304,6 +304,19 @@ button.danger:hover {
   box-shadow: 0 0 10px rgba(255, 68, 68, 0.3);
 }
 
+button.tertiary {
+  background: transparent;
+  border-color: var(--color-border);
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+button.tertiary:hover {
+  border-color: var(--color-text-secondary);
+  color: var(--color-text-secondary);
+  box-shadow: none;
+}
+
 /* Status messages */
 .status {
   padding: var(--space-sm) var(--space-md);
@@ -1368,7 +1381,7 @@ button.success {
 
 .dashboard-container {
   position: absolute;
-  top: 0;
+  top: var(--topbar-height);
   left: 0;
   right: 0;
   bottom: 0;
@@ -1379,7 +1392,6 @@ button.success {
   background: linear-gradient(135deg, var(--color-bg-primary) 0%, var(--color-bg-surface) 50%, var(--color-bg-primary) 100%);
   overflow-y: auto;
   z-index: 100;
-  padding-top: calc(var(--topbar-height) + var(--space-md));
 }
 
 /* Profile Sidebar */
@@ -1458,7 +1470,7 @@ button.success {
 
 .user-stats {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
   text-align: center;
 }
@@ -1778,7 +1790,7 @@ button.success {
   }
 
   .user-stats {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 8px;
   }
 

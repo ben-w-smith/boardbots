@@ -80,7 +80,6 @@ export class DashboardUI {
   setConnectionStatus(status: ConnectionStatus): void {
     if (this.state) {
       this.state.connectionStatus = status;
-      this.updateConnectionStatusElement();
     }
   }
 
@@ -168,37 +167,8 @@ export class DashboardUI {
       <div class="user-profile">
         <div class="user-avatar">${initial}</div>
         <h2 class="user-name">${this.escapeHtml(user.username)}</h2>
-        ${this.getConnectionStatusHtml()}
       </div>
     `;
-  }
-
-  /** Get connection status HTML string */
-  private getConnectionStatusHtml(): string {
-    if (!this.state) return '';
-
-    const statusConfig: Record<ConnectionStatus, { class: string; text: string }> = {
-      connected: { class: 'connected', text: 'Online' },
-      connecting: { class: 'connecting', text: 'Connecting...' },
-      reconnecting: { class: 'reconnecting', text: 'Reconnecting...' },
-      disconnected: { class: 'disconnected', text: 'Offline' },
-    };
-
-    const config = statusConfig[this.state.connectionStatus];
-    return `
-      <div class="online-status">
-        <span class="status-dot ${config.class}"></span>
-        <span class="status-text">${config.text}</span>
-      </div>
-    `;
-  }
-
-  /** Update only the connection status element in DOM */
-  private updateConnectionStatusElement(): void {
-    const statusEl = this.dashboardEl.querySelector('.online-status');
-    if (statusEl && this.state) {
-      statusEl.outerHTML = this.getConnectionStatusHtml();
-    }
   }
 
   /** Render stats section */
@@ -224,6 +194,10 @@ export class DashboardUI {
           <div class="stat-value">${stats.wins}</div>
           <div class="stat-label">Wins</div>
         </div>
+        <div class="stat-item">
+          <div class="stat-value">${stats.losses}</div>
+          <div class="stat-label">Losses</div>
+        </div>
       </div>
     `;
   }
@@ -236,7 +210,7 @@ export class DashboardUI {
 
     return `
       <div class="quick-actions">
-        <button class="action-btn primary" id="dashboard-btn-create">Create Game</button>
+        <button class="action-btn primary" id="dashboard-btn-create">New Game</button>
         ${aiButton}
         <div class="join-game-form">
           <input
@@ -246,7 +220,7 @@ export class DashboardUI {
             maxlength="6"
             id="dashboard-join-code"
           />
-          <button class="action-btn" id="dashboard-btn-join">Join</button>
+          <button class="action-btn tertiary" id="dashboard-btn-join">Join</button>
         </div>
         ${this.renderDifficultySelector()}
         <button class="action-btn danger" id="dashboard-btn-logout">Logout</button>
