@@ -45,6 +45,11 @@ class AuthManager {
     };
   }
 
+  /** Get the current user (if authenticated) */
+  getUser(): User | null {
+    return this.user;
+  }
+
   /** Subscribe to auth state changes */
   subscribe(callback: AuthCallback): () => void {
     this.callbacks.add(callback);

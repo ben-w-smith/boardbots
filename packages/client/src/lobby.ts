@@ -21,8 +21,6 @@ export interface LobbyOptions {
   onLogin?: () => void;
   /** Called when player wants to register a new account */
   onRegister?: () => void;
-  /** Called when logged-in user wants to go to dashboard */
-  onGoToDashboard?: () => void;
 }
 
 const PLAYER_NAME_KEY = 'lockitdown_player_name';
@@ -75,7 +73,6 @@ export class LobbyUI {
   private onConnectToGame?: (gameCode: string, playerName: string) => void;
   private onLogin?: () => void;
   private onRegister?: () => void;
-  private onGoToDashboard?: () => void;
 
   private currentMode: LobbyMode = 'landing';
   private lobbyEl: HTMLElement;
@@ -91,7 +88,6 @@ export class LobbyUI {
     this.onConnectToGame = options.onConnectToGame;
     this.onLogin = options.onLogin;
     this.onRegister = options.onRegister;
-    this.onGoToDashboard = options.onGoToDashboard;
 
     this.playerName = getSavedPlayerName();
 
@@ -187,12 +183,6 @@ export class LobbyUI {
 
       this.lobbyEl.innerHTML = `
         <div class="lobby-content">
-          <div class="auth-status logged-in">
-            <span class="user-greeting">Logged in as <strong>${this.escapeHtml(authState.user.username)}</strong></span>
-            <button id="btn-dashboard" class="auth-btn secondary">Dashboard</button>
-            <button id="btn-logout" class="auth-btn">Logout</button>
-          </div>
-
           <div class="lobby-header">
             <h1 class="lobby-title">Lock It Down</h1>
             <p class="lobby-subtitle">A hex-based tactical board game</p>
@@ -270,8 +260,6 @@ export class LobbyUI {
     const btnVsAI = this.lobbyEl.querySelector('#btn-vs-ai');
     const btnLogin = this.lobbyEl.querySelector('#btn-login');
     const btnRegister = this.lobbyEl.querySelector('#btn-register');
-    const btnLogout = this.lobbyEl.querySelector('#btn-logout');
-    const btnDashboard = this.lobbyEl.querySelector('#btn-dashboard');
     const difficultyBtns = this.lobbyEl.querySelectorAll('.difficulty-btn');
 
     const authState = authManager.getState();
@@ -346,19 +334,6 @@ export class LobbyUI {
       if (this.onRegister) {
         this.onRegister();
       }
-    });
-
-    // Dashboard button
-    btnDashboard?.addEventListener('click', () => {
-      if (this.onGoToDashboard) {
-        this.onGoToDashboard();
-      }
-    });
-
-    // Logout button
-    btnLogout?.addEventListener('click', () => {
-      authManager.logout();
-      this.render();
     });
 
     // Enter key to proceed
@@ -618,11 +593,5 @@ export class LobbyUI {
       return false;
     }
     return true;
-  }
-
-  private escapeHtml(text: string): string {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
   }
 }

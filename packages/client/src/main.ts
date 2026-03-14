@@ -7,6 +7,7 @@ import { LobbyUI, getSavedPlayerName, savePlayerName } from "./lobby.js";
 import { authManager } from "./auth.js";
 import { LoginModal } from "./login-modal.js";
 import { DashboardUI } from "./dashboard.js";
+import { TopBar } from "./topbar.js";
 import { router } from "./router.js";
 import { animator } from "./animator.js";
 import { getAudioManager } from "./audio.js";
@@ -129,6 +130,40 @@ const gameUI = new GameUI({
     gameUI.hideGameOver();
     resetGame();
   },
+  onGoToDashboard: () => {
+    showDashboard();
+  },
+  onNewGame: async () => {
+    // Create a new game and connect to it
+    try {
+      const response = await authManager.authFetch("/api/lobby/create", { method: "POST" });
+      if (response.ok) {
+        const data = await response.json();
+        const gameCode = data.gameCode;
+
+        // Reset game state
+        resetGame();
+
+        // Update URL and connect to the new game
+        currentGameCode = gameCode;
+        router.navigate("/game", { gameCode });
+
+        // Use the current player name or the logged-in user's name
+        const playerName = currentPlayerName || authManager.getState().user?.username || generatePlayerName();
+        socket.connect(gameCode, playerName);
+
+        // Show lobby waiting screen
+        dashboardUI.hide();
+        lobbyUI.showWaiting(gameCode);
+      } else if (response.status === 401) {
+        // Not authenticated - go to landing page
+        showLandingPage();
+      }
+    } catch (error) {
+      console.error("Failed to create new game:", error);
+      showDashboard();
+    }
+  },
 });
 
 // Initialize login modal
@@ -137,6 +172,28 @@ const loginModal = new LoginModal({
   onLogin: () => {
     // Auth state change will be picked up by authManager.subscribe
     // which will update the UI
+  },
+});
+
+// Initialize top bar navigation
+const topBar = new TopBar({
+  container: appContainer,
+  onNavigate: (route: 'home' | 'dashboard') => {
+    if (route === 'home') {
+      // Show lobby (landing page)
+      showLandingPage();
+    } else if (route === 'dashboard') {
+      // Show dashboard (requires auth)
+      showDashboard();
+    }
+  },
+  onLogin: () => {
+    loginModal.show('login');
+  },
+  onLogout: () => {
+    authManager.logout();
+    topBar.update();
+    showLandingPage();
   },
 });
 
@@ -294,9 +351,6 @@ const lobbyUI = new LobbyUI({
   },
   onRegister: () => {
     loginModal.show("register");
-  },
-  onGoToDashboard: () => {
-    showDashboard();
   },
 });
 
@@ -612,6 +666,7 @@ function startAnimationLoop(): void {
 
 // Connect to a game
 function connectToGame(gameCode: string, playerName: string) {
+  topBar.hide(); // Hide top bar in game view
   dashboardUI.hide();
   lobbyUI.hide();
   gameUI.setStatus("connecting");
@@ -624,6 +679,9 @@ function connectToGame(gameCode: string, playerName: string) {
 async function showDashboard() {
   const authState = authManager.getState();
   if (authState.isAuthenticated && authState.user) {
+    topBar.show();
+    topBar.setActive('dashboard');
+    topBar.update();
     lobbyUI.hide();
     gameUI.hide();
     await dashboardUI.show(authState.user);
@@ -632,6 +690,9 @@ async function showDashboard() {
 
 // Show landing page (lobby) for non-authenticated user
 function showLandingPage() {
+  topBar.show();
+  topBar.setActive('home');
+  topBar.update();
   dashboardUI.hide();
   gameUI.hide();
   setupDemoState();
@@ -642,6 +703,7 @@ function showLandingPage() {
 async function init() {
   // Subscribe to auth state changes
   authManager.subscribe(async () => {
+    topBar.update();
     const authState = authManager.getState();
     if (authState.isAuthenticated && authState.user) {
       await showDashboard();
@@ -652,6 +714,7 @@ async function init() {
 
   if (isDemoMode) {
     // Demo mode - just render with sample state
+    topBar.hide();
     setupDemoState();
     gameUI.hide();
     lobbyUI.hide();
