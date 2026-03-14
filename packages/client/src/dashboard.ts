@@ -8,6 +8,9 @@ import {
   formatRelativeTime,
   getOpponentName,
   getGameResult,
+  cancelGame,
+  archiveGame,
+  unarchiveGame,
   type GameHistoryItem,
   type GameHistoryResponse,
 } from './api/games.js';
@@ -80,7 +83,6 @@ export class DashboardUI {
   setConnectionStatus(status: ConnectionStatus): void {
     if (this.state) {
       this.state.connectionStatus = status;
-      this.updateConnectionStatusElement();
     }
   }
 
@@ -168,37 +170,8 @@ export class DashboardUI {
       <div class="user-profile">
         <div class="user-avatar">${initial}</div>
         <h2 class="user-name">${this.escapeHtml(user.username)}</h2>
-        ${this.getConnectionStatusHtml()}
       </div>
     `;
-  }
-
-  /** Get connection status HTML string */
-  private getConnectionStatusHtml(): string {
-    if (!this.state) return '';
-
-    const statusConfig: Record<ConnectionStatus, { class: string; text: string }> = {
-      connected: { class: 'connected', text: 'Online' },
-      connecting: { class: 'connecting', text: 'Connecting...' },
-      reconnecting: { class: 'reconnecting', text: 'Reconnecting...' },
-      disconnected: { class: 'disconnected', text: 'Offline' },
-    };
-
-    const config = statusConfig[this.state.connectionStatus];
-    return `
-      <div class="online-status">
-        <span class="status-dot ${config.class}"></span>
-        <span class="status-text">${config.text}</span>
-      </div>
-    `;
-  }
-
-  /** Update only the connection status element in DOM */
-  private updateConnectionStatusElement(): void {
-    const statusEl = this.dashboardEl.querySelector('.online-status');
-    if (statusEl && this.state) {
-      statusEl.outerHTML = this.getConnectionStatusHtml();
-    }
   }
 
   /** Render stats section */
@@ -224,6 +197,10 @@ export class DashboardUI {
           <div class="stat-value">${stats.wins}</div>
           <div class="stat-label">Wins</div>
         </div>
+        <div class="stat-item">
+          <div class="stat-value">${stats.losses}</div>
+          <div class="stat-label">Losses</div>
+        </div>
       </div>
     `;
   }
@@ -236,7 +213,7 @@ export class DashboardUI {
 
     return `
       <div class="quick-actions">
-        <button class="action-btn primary" id="dashboard-btn-create">Create Game</button>
+        <button class="action-btn primary" id="dashboard-btn-create">New Game</button>
         ${aiButton}
         <div class="join-game-form">
           <input
@@ -246,7 +223,7 @@ export class DashboardUI {
             maxlength="6"
             id="dashboard-join-code"
           />
-          <button class="action-btn" id="dashboard-btn-join">Join</button>
+          <button class="action-btn tertiary" id="dashboard-btn-join">Join</button>
         </div>
         ${this.renderDifficultySelector()}
         <button class="action-btn danger" id="dashboard-btn-logout">Logout</button>
@@ -297,9 +274,11 @@ export class DashboardUI {
       `;
     }
 
-    // Separate active and finished games
-    const activeGames = games.filter((g) => g.phase !== 'finished');
-    const finishedGames = games.filter((g) => g.phase === 'finished');
+    // Separate games by status and phase
+    const activeGames = games.filter((g) => g.status === 'active' && g.phase !== 'finished');
+    const cancelledGames = games.filter((g) => g.status === 'cancelled');
+    const completedGames = games.filter((g) => (g.status === 'completed' || g.status === 'active') && g.phase === 'finished');
+    const archivedGames = games.filter((g) => g.status === 'archived');
 
     let html = '';
 
@@ -311,21 +290,49 @@ export class DashboardUI {
           <span class="game-count">${activeGames.length}</span>
         </div>
         <div class="game-cards active-games">
-          ${activeGames.map((g) => this.renderGameCard(g)).join('')}
+          ${activeGames.map((g) => this.renderGameCard(g, true)).join('')}
         </div>
       `;
     }
 
-    // Game history section
-    html += `
-      <div class="game-list-header">
-        <h3>Game History</h3>
-        <span class="game-count">${pagination.total}</span>
-      </div>
-      <div class="game-cards finished-games">
-        ${finishedGames.map((g) => this.renderGameCard(g)).join('')}
-      </div>
-    `;
+    // Cancelled games section
+    if (cancelledGames.length > 0) {
+      html += `
+        <div class="game-list-header">
+          <h3>Cancelled Games</h3>
+          <span class="game-count">${cancelledGames.length}</span>
+        </div>
+        <div class="game-cards cancelled-games">
+          ${cancelledGames.map((g) => this.renderGameCard(g, false, true)).join('')}
+        </div>
+      `;
+    }
+
+    // Completed games section
+    if (completedGames.length > 0) {
+      html += `
+        <div class="game-list-header">
+          <h3>Completed Games</h3>
+          <span class="game-count">${completedGames.length}</span>
+        </div>
+        <div class="game-cards finished-games">
+          ${completedGames.map((g) => this.renderGameCard(g)).join('')}
+        </div>
+      `;
+    }
+
+    // Archived games section
+    if (archivedGames.length > 0) {
+      html += `
+        <div class="game-list-header">
+          <h3>Archived Games</h3>
+          <span class="game-count">${archivedGames.length}</span>
+        </div>
+        <div class="game-cards archived-games">
+          ${archivedGames.map((g) => this.renderGameCard(g, false, false, true)).join('')}
+        </div>
+      `;
+    }
 
     // Load more button
     if (pagination.hasMore) {
@@ -340,33 +347,99 @@ export class DashboardUI {
   }
 
   /** Render a single game card */
-  private renderGameCard(game: GameHistoryItem): string {
+  private renderGameCard(
+    game: GameHistoryItem,
+    showCancelButton: boolean = false,
+    showCancelledBadge: boolean = false,
+    showUnarchiveButton: boolean = false
+  ): string {
     if (!this.state) return '';
 
     const opponent = getOpponentName(game.players, this.state.user.username);
     const result = getGameResult(game.winnerId, this.state.user.id, game.phase);
-    const isActive = result === 'in_progress';
+    const isActive = result === 'in_progress' && game.status === 'active';
+    const isCancelled = game.status === 'cancelled';
+    const isArchived = game.status === 'archived';
     const timeAgo = formatRelativeTime(game.createdAt);
 
-    const resultClass = result === 'win' ? 'won' : result === 'loss' ? 'lost' : '';
-    const resultText = result === 'win' ? 'Won' : result === 'loss' ? 'Lost' : result === 'draw' ? 'Draw' : '';
+    let resultClass = result === 'win' ? 'won' : result === 'loss' ? 'lost' : '';
+    let resultText = result === 'win' ? 'Won' : result === 'loss' ? 'Lost' : result === 'draw' ? 'Draw' : '';
+
+    if (isCancelled) {
+      resultClass = 'cancelled';
+      resultText = 'Cancelled';
+    }
+
     const actionText = isActive ? 'Resume' : 'View';
 
+    // Build action buttons
+    let actionButtons = '';
+    if (showCancelButton) {
+      actionButtons = `
+        <div class="game-card-actions">
+          <button class="game-action-btn primary" data-game-code="${game.gameCode}" data-action="resume">
+            ${actionText}
+          </button>
+          <button class="game-action-btn danger" data-game-code="${game.gameCode}" data-action="cancel">
+            Cancel
+          </button>
+        </div>
+      `;
+    } else if (showUnarchiveButton) {
+      actionButtons = `
+        <div class="game-card-actions">
+          <button class="game-action-btn" data-game-code="${game.gameCode}" data-action="view">
+            View
+          </button>
+          <button class="game-action-btn secondary" data-game-code="${game.gameCode}" data-action="unarchive">
+            Restore
+          </button>
+        </div>
+      `;
+    } else if (showCancelledBadge) {
+      actionButtons = `
+        <div class="game-card-actions">
+          <button class="game-action-btn" data-game-code="${game.gameCode}" data-action="view">
+            View
+          </button>
+          <button class="game-action-btn secondary" data-game-code="${game.gameCode}" data-action="archive">
+            Archive
+          </button>
+        </div>
+      `;
+    } else if (game.phase === 'finished' && !isArchived) {
+      actionButtons = `
+        <div class="game-card-actions">
+          <button class="game-action-btn" data-game-code="${game.gameCode}" data-action="view">
+            View
+          </button>
+          <button class="game-action-btn secondary" data-game-code="${game.gameCode}" data-action="archive">
+            Archive
+          </button>
+        </div>
+      `;
+    } else {
+      actionButtons = `
+        <button class="game-action-btn" data-game-code="${game.gameCode}" data-action="view">
+          ${actionText}
+        </button>
+      `;
+    }
+
     return `
-      <div class="game-card ${isActive ? 'active' : ''} ${resultClass}" data-game-code="${game.gameCode}">
+      <div class="game-card ${isActive ? 'active' : ''} ${isArchived ? 'archived' : ''} ${resultClass}" data-game-code="${game.gameCode}">
         <div class="game-card-info">
           <div class="game-card-header">
             <span class="opponent-name">${this.escapeHtml(opponent)}</span>
-            ${!isActive ? `<span class="result-badge ${resultClass}">${resultText}</span>` : ''}
+            ${resultText ? `<span class="result-badge ${resultClass}">${resultText}</span>` : ''}
             ${game.aiEnabled ? '<span class="ai-badge">AI</span>' : ''}
+            ${isArchived ? '<span class="archived-badge">Archived</span>' : ''}
           </div>
           <div class="game-card-meta">
             <span class="timestamp">${timeAgo}</span>
           </div>
         </div>
-        <button class="game-action-btn" data-game-code="${game.gameCode}">
-          ${actionText}
-        </button>
+        ${actionButtons}
       </div>
     `;
   }
@@ -415,8 +488,9 @@ export class DashboardUI {
     gameCards.forEach((btn) => {
       btn.addEventListener('click', (e) => {
         const gameCode = (e.currentTarget as HTMLElement).dataset.gameCode;
+        const action = (e.currentTarget as HTMLElement).dataset.action || 'view';
         if (gameCode) {
-          this.handleGameAction(gameCode);
+          this.handleGameAction(gameCode, action);
         }
       });
     });
@@ -477,12 +551,73 @@ export class DashboardUI {
     this.onJoinGame(code, this.state.user.username);
   }
 
-  /** Handle game action (view/resume) */
-  private handleGameAction(gameCode: string): void {
+  /** Handle game action (view/resume/cancel/archive/unarchive) */
+  private async handleGameAction(gameCode: string, action: string): Promise<void> {
     if (!this.state) return;
-    // Navigate to the game
-    window.history.pushState({}, '', `?game=${gameCode}`);
-    this.onJoinGame(gameCode, this.state.user.username);
+
+    switch (action) {
+      case 'cancel':
+        await this.handleCancelGame(gameCode);
+        break;
+      case 'archive':
+        await this.handleArchiveGame(gameCode);
+        break;
+      case 'unarchive':
+        await this.handleUnarchiveGame(gameCode);
+        break;
+      case 'view':
+      case 'resume':
+      default:
+        // Navigate to the game
+        window.history.pushState({}, '', `?game=${gameCode}`);
+        this.onJoinGame(gameCode, this.state.user.username);
+        break;
+    }
+  }
+
+  /** Handle cancel game */
+  private async handleCancelGame(gameCode: string): Promise<void> {
+    if (!this.state) return;
+
+    const confirmed = confirm('Are you sure you want to cancel this game? This cannot be undone.');
+    if (!confirmed) return;
+
+    try {
+      await cancelGame(gameCode);
+      // Reload dashboard data to reflect the change
+      await this.loadDashboardData(this.state.user);
+    } catch (error) {
+      console.error('Failed to cancel game:', error);
+      this.showError('Failed to cancel game. Please try again.');
+    }
+  }
+
+  /** Handle archive game */
+  private async handleArchiveGame(gameCode: string): Promise<void> {
+    if (!this.state) return;
+
+    try {
+      await archiveGame(gameCode);
+      // Reload dashboard data to reflect the change
+      await this.loadDashboardData(this.state.user);
+    } catch (error) {
+      console.error('Failed to archive game:', error);
+      this.showError('Failed to archive game. Please try again.');
+    }
+  }
+
+  /** Handle unarchive game */
+  private async handleUnarchiveGame(gameCode: string): Promise<void> {
+    if (!this.state) return;
+
+    try {
+      await unarchiveGame(gameCode);
+      // Reload dashboard data to reflect the change
+      await this.loadDashboardData(this.state.user);
+    } catch (error) {
+      console.error('Failed to unarchive game:', error);
+      this.showError('Failed to restore game. Please try again.');
+    }
   }
 
   /** Handle logout */

@@ -167,7 +167,7 @@ export class LobbyUI {
     const isAuthenticated = authState.isAuthenticated;
 
     // For logged-in users: show full game creation options
-    // For guests: only show Login and Join Game
+    // For guests: show new full-width landing page
     if (isAuthenticated && authState.user) {
       // Logged in - show full options
       const difficultyOptions = hasAIGame ? `
@@ -199,53 +199,50 @@ export class LobbyUI {
 
             <div class="lobby-error"></div>
           </div>
-
-          <div class="lobby-instructions">
-            <p>Place robots on the corridor, then move them to lock down your opponent's bots!</p>
-          </div>
         </div>
       `;
     } else {
-      // Guest - show simplified landing with Login as main CTA
+      // Guest - show new full-width landing page
       this.lobbyEl.innerHTML = `
-        <div class="lobby-content">
-          <div class="lobby-header">
-            <h1 class="lobby-title">Lock It Down</h1>
-            <p class="lobby-subtitle">A hex-based tactical board game</p>
-          </div>
-
-          <div class="lobby-form">
-            <div class="lobby-buttons guest-buttons">
-              <button id="btn-login" class="primary large">Log In</button>
+        <div class="landing-container">
+          <!-- Hero Section -->
+          <section class="landing-hero">
+            <h1 class="landing-title">Lock It Down</h1>
+            <p class="landing-tagline">A hex-based tactical board game where robots battle for control</p>
+            <div class="landing-hero-actions">
+              <button id="btn-login" class="primary large">Log In to Play</button>
               <button id="btn-register" class="secondary large">Create Account</button>
             </div>
+          </section>
 
-            <div class="guest-divider">
-              <span>or</span>
+          <!-- How It Works -->
+          <section class="landing-info">
+            <div class="info-card">
+              <span class="info-icon">🤖</span>
+              <h3>Place Robots</h3>
+              <p>Deploy your robots onto the hex corridor</p>
             </div>
-
-            <div class="form-group">
-              <label for="game-code">Join a Game</label>
-              <div class="join-game-row">
-                <input
-                  type="text"
-                  id="game-code"
-                  class="lobby-input"
-                  placeholder="Enter game code"
-                  maxlength="6"
-                  autocomplete="off"
-                  autocapitalize="characters"
-                />
-                <button id="btn-join" class="primary">Join</button>
-              </div>
+            <div class="info-card">
+              <span class="info-icon">🔒</span>
+              <h3>Lock Them Down</h3>
+              <p>Trap your opponent's robots with beam locks</p>
             </div>
+            <div class="info-card">
+              <span class="info-icon">🏆</span>
+              <h3>Win the Match</h3>
+              <p>Lock down more robots than your opponent to win</p>
+            </div>
+          </section>
 
+          <!-- Join Game (Guest) -->
+          <section class="landing-join">
+            <p>Have a game code? Join as a guest:</p>
+            <div class="join-game-row">
+              <input type="text" id="game-code" class="lobby-input" placeholder="Enter game code" maxlength="6" />
+              <button id="btn-join" class="primary">Join</button>
+            </div>
             <div class="lobby-error"></div>
-          </div>
-
-          <div class="lobby-instructions">
-            <p><strong>Guests</strong> can join existing games. <strong>Log in</strong> to create games and track your stats!</p>
-          </div>
+          </section>
         </div>
       `;
     }
