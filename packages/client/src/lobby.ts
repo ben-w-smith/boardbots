@@ -2,6 +2,8 @@
  * Lobby UI - Handles landing page, create/join game screens
  */
 
+import { authManager } from './auth.js';
+
 export type LobbyMode = 'landing' | 'create' | 'join' | 'waiting';
 
 export interface LobbyOptions {
@@ -15,6 +17,12 @@ export interface LobbyOptions {
   onJoinGame: (gameCode: string, playerName: string) => void;
   /** Called when a game is created and the player should connect */
   onConnectToGame?: (gameCode: string, playerName: string) => void;
+  /** Called when player wants to log in */
+  onLogin?: () => void;
+  /** Called when player wants to register a new account */
+  onRegister?: () => void;
+  /** Called when logged-in user wants to go to dashboard */
+  onGoToDashboard?: () => void;
 }
 
 const PLAYER_NAME_KEY = 'lockitdown_player_name';
@@ -65,6 +73,9 @@ export class LobbyUI {
   private onCreateAIGame?: (playerName: string, aiDepth: number) => Promise<string | null>;
   private onJoinGame: (gameCode: string, playerName: string) => void;
   private onConnectToGame?: (gameCode: string, playerName: string) => void;
+  private onLogin?: () => void;
+  private onRegister?: () => void;
+  private onGoToDashboard?: () => void;
 
   private currentMode: LobbyMode = 'landing';
   private lobbyEl: HTMLElement;
@@ -78,6 +89,9 @@ export class LobbyUI {
     this.onCreateAIGame = options.onCreateAIGame;
     this.onJoinGame = options.onJoinGame;
     this.onConnectToGame = options.onConnectToGame;
+    this.onLogin = options.onLogin;
+    this.onRegister = options.onRegister;
+    this.onGoToDashboard = options.onGoToDashboard;
 
     this.playerName = getSavedPlayerName();
 
@@ -113,6 +127,14 @@ export class LobbyUI {
     this.render();
   }
 
+  /** Show the waiting screen with a game code (used after creating a game) */
+  showWaiting(code: string): void {
+    this.gameCode = code;
+    this.currentMode = 'waiting';
+    this.render();
+    this.lobbyEl.style.display = 'flex';
+  }
+
   /** Show error message */
   showError(message: string): void {
     const errorEl = this.lobbyEl.querySelector('.lobby-error') as HTMLElement | null;
@@ -145,54 +167,98 @@ export class LobbyUI {
 
   private renderLanding(): void {
     const hasAIGame = !!this.onCreateAIGame;
-    const difficultyOptions = hasAIGame ? `
-      <div class="form-group">
-        <label>AI Difficulty</label>
-        <div class="difficulty-selector">
-          <button class="difficulty-btn ${this.aiDepth === 2 ? 'active' : ''}" data-depth="2">Easy</button>
-          <button class="difficulty-btn ${this.aiDepth === 3 ? 'active' : ''}" data-depth="3">Medium</button>
-          <button class="difficulty-btn ${this.aiDepth === 4 ? 'active' : ''}" data-depth="4">Hard</button>
-        </div>
-      </div>
-    ` : '';
+    const authState = authManager.getState();
+    const isAuthenticated = authState.isAuthenticated;
 
-    this.lobbyEl.innerHTML = `
-      <div class="lobby-content">
-        <div class="lobby-header">
-          <h1 class="lobby-title">Lock It Down</h1>
-          <p class="lobby-subtitle">A hex-based tactical board game</p>
+    // For logged-in users: show full game creation options
+    // For guests: only show Login and Join Game
+    if (isAuthenticated && authState.user) {
+      // Logged in - show full options
+      const difficultyOptions = hasAIGame ? `
+        <div class="form-group">
+          <label>AI Difficulty</label>
+          <div class="difficulty-selector">
+            <button class="difficulty-btn ${this.aiDepth === 2 ? 'active' : ''}" data-depth="2">Easy</button>
+            <button class="difficulty-btn ${this.aiDepth === 3 ? 'active' : ''}" data-depth="3">Medium</button>
+            <button class="difficulty-btn ${this.aiDepth === 4 ? 'active' : ''}" data-depth="4">Hard</button>
+          </div>
         </div>
+      ` : '';
 
-        <div class="lobby-form">
-          <div class="form-group">
-            <label for="player-name">Your Name</label>
-            <input
-              type="text"
-              id="player-name"
-              class="lobby-input"
-              placeholder="Enter your name"
-              value="${this.escapeHtml(this.playerName)}"
-              maxlength="20"
-              autocomplete="off"
-            />
+      this.lobbyEl.innerHTML = `
+        <div class="lobby-content">
+          <div class="auth-status logged-in">
+            <span class="user-greeting">Logged in as <strong>${this.escapeHtml(authState.user.username)}</strong></span>
+            <button id="btn-dashboard" class="auth-btn secondary">Dashboard</button>
+            <button id="btn-logout" class="auth-btn">Logout</button>
           </div>
 
-          ${difficultyOptions}
-
-          <div class="lobby-buttons">
-            <button id="btn-create" class="primary">Create Game</button>
-            ${hasAIGame ? '<button id="btn-vs-ai" class="secondary">Play vs AI</button>' : ''}
-            <button id="btn-join">Join Game</button>
+          <div class="lobby-header">
+            <h1 class="lobby-title">Lock It Down</h1>
+            <p class="lobby-subtitle">A hex-based tactical board game</p>
           </div>
 
-          <div class="lobby-error"></div>
-        </div>
+          <div class="lobby-form">
+            ${difficultyOptions}
 
-        <div class="lobby-instructions">
-          <p>Place robots on the corridor, then move them to lock down your opponent's bots!</p>
+            <div class="lobby-buttons">
+              <button id="btn-create" class="primary">Create Game</button>
+              ${hasAIGame ? '<button id="btn-vs-ai" class="secondary">Play vs AI</button>' : ''}
+              <button id="btn-join">Join Game</button>
+            </div>
+
+            <div class="lobby-error"></div>
+          </div>
+
+          <div class="lobby-instructions">
+            <p>Place robots on the corridor, then move them to lock down your opponent's bots!</p>
+          </div>
         </div>
-      </div>
-    `;
+      `;
+    } else {
+      // Guest - show simplified landing with Login as main CTA
+      this.lobbyEl.innerHTML = `
+        <div class="lobby-content">
+          <div class="lobby-header">
+            <h1 class="lobby-title">Lock It Down</h1>
+            <p class="lobby-subtitle">A hex-based tactical board game</p>
+          </div>
+
+          <div class="lobby-form">
+            <div class="lobby-buttons guest-buttons">
+              <button id="btn-login" class="primary large">Log In</button>
+              <button id="btn-register" class="secondary large">Create Account</button>
+            </div>
+
+            <div class="guest-divider">
+              <span>or</span>
+            </div>
+
+            <div class="form-group">
+              <label for="game-code">Join a Game</label>
+              <div class="join-game-row">
+                <input
+                  type="text"
+                  id="game-code"
+                  class="lobby-input"
+                  placeholder="Enter game code"
+                  maxlength="6"
+                  autocomplete="off"
+                  autocapitalize="characters"
+                />
+                <button id="btn-join" class="primary">Join</button>
+              </div>
+            </div>
+
+            <div class="lobby-error"></div>
+          </div>
+
+          <div class="lobby-instructions">
+            <p><strong>Guests</strong> can join existing games. <strong>Log in</strong> to create games and track your stats!</p>
+          </div>
+        </div>
+      `;
+    }
 
     this.setupLandingHandlers();
   }
@@ -202,15 +268,23 @@ export class LobbyUI {
     const btnCreate = this.lobbyEl.querySelector('#btn-create');
     const btnJoin = this.lobbyEl.querySelector('#btn-join');
     const btnVsAI = this.lobbyEl.querySelector('#btn-vs-ai');
+    const btnLogin = this.lobbyEl.querySelector('#btn-login');
+    const btnRegister = this.lobbyEl.querySelector('#btn-register');
+    const btnLogout = this.lobbyEl.querySelector('#btn-logout');
+    const btnDashboard = this.lobbyEl.querySelector('#btn-dashboard');
     const difficultyBtns = this.lobbyEl.querySelectorAll('.difficulty-btn');
 
-    // Update player name on input
-    nameInput?.addEventListener('input', () => {
-      this.playerName = nameInput.value.trim();
-    });
+    const authState = authManager.getState();
 
-    // Focus name input if empty
-    if (!this.playerName && nameInput) {
+    // Update player name on input (only for guests)
+    if (nameInput && !authState.isAuthenticated) {
+      nameInput.addEventListener('input', () => {
+        this.playerName = nameInput.value.trim();
+      });
+    }
+
+    // Focus name input if empty and not logged in
+    if (!this.playerName && nameInput && !authState.isAuthenticated) {
       nameInput.focus();
     }
 
@@ -240,11 +314,51 @@ export class LobbyUI {
     });
 
     btnJoin?.addEventListener('click', () => {
-      if (this.validateName()) {
-        savePlayerName(this.playerName);
-        this.currentMode = 'join';
-        this.render();
+      // For guests, generate a random name if not set
+      if (!authState.isAuthenticated && !this.playerName) {
+        this.playerName = `Guest_${Math.random().toString(36).substring(2, 6)}`;
       }
+      // For guests, directly handle join with game code
+      if (!authState.isAuthenticated) {
+        const joinInput = this.lobbyEl.querySelector('#game-code') as HTMLInputElement;
+        if (joinInput) {
+          this.handleJoinClick(joinInput.value);
+        }
+      } else {
+        // For logged-in users, go to join screen
+        if (this.validateName()) {
+          savePlayerName(this.playerName);
+          this.currentMode = 'join';
+          this.render();
+        }
+      }
+    });
+
+    // Login button - triggers login modal
+    btnLogin?.addEventListener('click', () => {
+      if (this.onLogin) {
+        this.onLogin();
+      }
+    });
+
+    // Register button - triggers register modal
+    btnRegister?.addEventListener('click', () => {
+      if (this.onRegister) {
+        this.onRegister();
+      }
+    });
+
+    // Dashboard button
+    btnDashboard?.addEventListener('click', () => {
+      if (this.onGoToDashboard) {
+        this.onGoToDashboard();
+      }
+    });
+
+    // Logout button
+    btnLogout?.addEventListener('click', () => {
+      authManager.logout();
+      this.render();
     });
 
     // Enter key to proceed
@@ -254,6 +368,17 @@ export class LobbyUI {
           savePlayerName(this.playerName);
           this.handleCreateClick();
         }
+      }
+    });
+
+    // Enter key in guest game code input
+    const guestJoinInput = this.lobbyEl.querySelector('#game-code') as HTMLInputElement;
+    guestJoinInput?.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        if (!authState.isAuthenticated && !this.playerName) {
+          this.playerName = `Guest_${Math.random().toString(36).substring(2, 6)}`;
+        }
+        this.handleJoinClick(guestJoinInput.value);
       }
     });
   }
@@ -408,11 +533,9 @@ export class LobbyUI {
       return;
     }
 
+    // Generate a guest name if not set (for guest users)
     if (!this.playerName) {
-      this.showError('Please enter your name first.');
-      this.currentMode = 'landing';
-      this.render();
-      return;
+      this.playerName = `Guest_${Math.random().toString(36).substring(2, 6)}`;
     }
 
     savePlayerName(this.playerName);

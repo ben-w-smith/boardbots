@@ -392,6 +392,7 @@ export class GameUI {
         </p>
         <div class="victory-buttons">
           <button id="victory-rematch" class="primary">Rematch</button>
+          <button id="victory-dashboard">Dashboard</button>
           <button id="victory-new-game">New Game</button>
         </div>
       </div>
@@ -521,6 +522,9 @@ export class GameUI {
     const btnAI = this.bottomPanel.querySelector('#btn-ai') as HTMLButtonElement;
     const btnStart = this.bottomPanel.querySelector('#btn-start') as HTMLButtonElement;
 
+    // Check if it's the current player's turn
+    const isMyTurn = this.gameState?.playerTurn === this.myPlayerIndex;
+
     switch (this.phase) {
       case 'waiting':
         if (turnControls) (turnControls as HTMLElement).style.display = 'none';
@@ -538,13 +542,16 @@ export class GameUI {
         }
         break;
       case 'playing':
-        if (turnControls) (turnControls as HTMLElement).style.display = 'flex';
+        // Only show turn controls when it's the player's turn
+        if (turnControls) {
+          (turnControls as HTMLElement).style.display = isMyTurn ? 'flex' : 'none';
+        }
         if (waitingControls) (waitingControls as HTMLElement).style.display = 'none';
         if (btnAI) {
           // Hide AI button in AI games (moves are automatic)
           btnAI.style.display = this.aiEnabled ? 'none' : 'inline-block';
           if (!this.aiEnabled) {
-            btnAI.disabled = !this.gameState || this.gameState.playerTurn !== this.myPlayerIndex;
+            btnAI.disabled = !this.gameState || !isMyTurn;
           }
         }
         break;

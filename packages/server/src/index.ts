@@ -3,10 +3,12 @@ import { createServer } from "http";
 import { WebSocketServer } from "ws";
 import cors from "cors";
 import helmet from "helmet";
+import cookieParser from "cookie-parser";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { RoomManager } from "./RoomManager.js";
-import { authRoutes, verifyToken, validateJwtSecret } from "./auth/index.js";
+import { authRoutes, verifyToken, validateJwtSecret, requireAuth } from "./auth/index.js";
+import { dbService } from "./db.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -54,6 +56,7 @@ app.use(cors({
 }));
 
 app.use(express.json());
+app.use(cookieParser());
 
 const clientDistPath = path.join(__dirname, "../../client/dist");
 app.use(express.static(clientDistPath));
@@ -76,10 +79,70 @@ app.get("/api/health", (req, res) => {
 // Auth routes
 app.use("/api/auth", authRoutes);
 
-// Create a new game lobby
-app.post("/api/lobby/create", (req, res) => {
+// Create a new game lobby (requires authentication)
+app.post("/api/lobby/create", requireAuth, (req, res) => {
+  // Associate game with authenticated user
+  const userId = req.user?.userId;
   const gameCode = generateGameCode();
-  res.json({ gameCode });
+  res.json({ gameCode, userId });
+});
+
+// Get game history for authenticated user
+app.get("/api/games", requireAuth, (req, res) => {
+  const userId = req.user?.userId;
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  // Parse and validate query parameters
+  let limit = parseInt(req.query.limit as string) || 20;
+  let offset = parseInt(req.query.offset as string) || 0;
+
+  // Enforce limits
+  limit = Math.min(Math.max(1, limit), 50); // 1-50 range
+  offset = Math.max(0, offset); // non-negative
+
+  const games = dbService.getUserGames(userId, limit, offset);
+  const total = dbService.getUserGamesCount(userId);
+
+  res.json({
+    games,
+    pagination: {
+      total,
+      limit,
+      offset,
+      hasMore: offset + limit < total,
+    },
+  });
+});
+
+// Get single game details for authenticated user
+app.get("/api/games/:gameCode", requireAuth, (req, res) => {
+  const userId = req.user?.userId;
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const gameCode = String(req.params.gameCode).toUpperCase();
+
+  const game = dbService.getUserGameDetail(userId, gameCode);
+  if (!game) {
+    return res.status(404).json({ error: "Game not found" });
+  }
+
+  res.json({
+    game: {
+      gameCode: game.gameCode,
+      state: game.state,
+      players: game.players,
+      phase: game.phase,
+      createdAt: game.createdAt,
+      winnerId: game.winnerId,
+      aiEnabled: game.aiEnabled === true || (game as any).aiEnabled === 1,
+      aiDepth: game.aiDepth ?? 3,
+      aiPlayerIndex: game.aiPlayerIndex ?? null,
+    },
+  });
 });
 
 // SPA routing fallback
@@ -106,19 +169,8 @@ server.on("upgrade", (request, socket, head) => {
       return;
     }
 
-    // Extract optional auth token from Sec-WebSocket-Protocol header
-    // The protocol header format is: "Sec-WebSocket-Protocol: auth-token, <token>"
-    // We extract the token value after "auth-token,"
-    const protocolHeader = request.headers["sec-websocket-protocol"];
-    let token: string | null = null;
-    if (protocolHeader) {
-      const protocols = protocolHeader.split(",").map((p) => p.trim());
-      const authProtocol = protocols.find((p) => p.startsWith("auth-token,"));
-      if (authProtocol) {
-        token = authProtocol.replace("auth-token,", "").trim();
-      }
-    }
-
+    // Extract token from query parameter (preferred method)
+    const token = url.searchParams.get("token") as string | null;
     const user = token ? verifyToken(token) : null;
 
     // Handle upgrade, accepting the auth-token protocol if provided

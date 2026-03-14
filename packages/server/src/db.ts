@@ -88,6 +88,39 @@ export interface UserStats {
   losses: number;
 }
 
+export interface GameHistoryItem {
+  gameCode: string;
+  phase: string;
+  players: string;
+  createdAt: number;
+  winnerId: number | null;
+  aiEnabled: boolean;
+}
+
+export interface GameHistoryResponse {
+  games: GameHistoryItem[];
+  pagination: {
+    total: number;
+    limit: number;
+    offset: number;
+    hasMore: boolean;
+  };
+}
+
+export interface GameDetailResponse {
+  game: {
+    gameCode: string;
+    state: string | null;
+    players: string;
+    phase: string;
+    createdAt: number;
+    winnerId: number | null;
+    aiEnabled: boolean;
+    aiDepth: number;
+    aiPlayerIndex: number | null;
+  };
+}
+
 export const dbService = {
   // Game operations
   saveGame(game: GameRecord) {
@@ -169,5 +202,45 @@ export const dbService = {
       "UPDATE games SET winnerId = ? WHERE gameCode = ?"
     );
     stmt.run(winnerId, gameCode);
+  },
+
+  // Get paginated games for a user (as host), ordered by createdAt desc
+  getUserGames(userId: number, limit: number = 20, offset: number = 0): GameHistoryItem[] {
+    const stmt = db.prepare(`
+      SELECT gameCode, phase, players, createdAt, winnerId, aiEnabled
+      FROM games
+      WHERE userId = ?
+      ORDER BY createdAt DESC
+      LIMIT ? OFFSET ?
+    `);
+    const rows = stmt.all(userId, limit, offset) as any[];
+    return rows.map(row => ({
+      gameCode: row.gameCode,
+      phase: row.phase,
+      players: row.players,
+      createdAt: row.createdAt,
+      winnerId: row.winnerId,
+      aiEnabled: row.aiEnabled === 1,
+    }));
+  },
+
+  // Get total count of games for a user (for pagination)
+  getUserGamesCount(userId: number): number {
+    const stmt = db.prepare(`
+      SELECT COUNT(*) as total
+      FROM games
+      WHERE userId = ?
+    `);
+    const result = stmt.get(userId) as { total: number };
+    return result.total;
+  },
+
+  // Get full game details for a specific game (only if owned by user)
+  getUserGameDetail(userId: number, gameCode: string): GameRecord | null {
+    const stmt = db.prepare(`
+      SELECT * FROM games
+      WHERE userId = ? AND gameCode = ?
+    `);
+    return stmt.get(userId, gameCode) as GameRecord | null;
   },
 };

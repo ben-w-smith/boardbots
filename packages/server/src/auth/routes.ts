@@ -6,7 +6,7 @@ import {
   validatePassword,
   validatePasswordStrength,
 } from "./password.js";
-import { generateToken } from "./jwt.js";
+import { generateToken, generateTokenPair, verifyRefreshToken, JwtPayload } from "./jwt.js";
 import { requireAuth } from "./middleware.js";
 import { loginLimiter, registerLimiter } from "./rate-limiter.js";
 
@@ -98,15 +98,24 @@ router.post(
       const passwordHash = await hashPassword(password);
       const user = dbService.createUser(normalizedUsername, passwordHash);
 
-      // Generate token
-      const token = generateToken({
+      // Generate token pair
+      const tokens = generateTokenPair({
         userId: user.id,
         username: user.username,
       });
 
+      // Set refresh token as httpOnly cookie
+      res.cookie("refreshToken", tokens.refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        path: "/",
+      });
+
       res.status(201).json({
         user: { id: user.id, username: user.username },
-        token,
+        token: tokens.accessToken,
       });
     } catch (error) {
       console.error("Registration error:", error);
@@ -146,17 +155,82 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    // Generate token
-    const token = generateToken({ userId: user.id, username: user.username });
+    // Generate token pair
+    const tokens = generateTokenPair({ userId: user.id, username: user.username });
+
+    // Set refresh token as httpOnly cookie
+    res.cookie("refreshToken", tokens.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      path: "/",
+    });
 
     res.json({
       user: { id: user.id, username: user.username },
-      token,
+      token: tokens.accessToken,
     });
   } catch (error) {
     console.error("Login error:", error);
     res.status(500).json({ error: "Internal server error" });
   }
+});
+
+/**
+ * POST /api/auth/refresh
+ * Refresh access token using refresh token from cookie
+ */
+router.post("/refresh", async (req: Request, res: Response) => {
+  try {
+    const refreshToken = req.cookies?.refreshToken;
+
+    if (!refreshToken) {
+      return res.status(401).json({ error: "No refresh token provided" });
+    }
+
+    const payload = verifyRefreshToken(refreshToken);
+    if (!payload) {
+      res.clearCookie("refreshToken", { path: "/" });
+      return res.status(401).json({ error: "Invalid or expired refresh token" });
+    }
+
+    // Verify user still exists
+    const user = dbService.getUserById(payload.userId);
+    if (!user) {
+      res.clearCookie("refreshToken", { path: "/" });
+      return res.status(401).json({ error: "User not found" });
+    }
+
+    // Generate new token pair
+    const tokens = generateTokenPair({ userId: user.id, username: user.username });
+
+    // Set new refresh token as httpOnly cookie
+    res.cookie("refreshToken", tokens.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      path: "/",
+    });
+
+    res.json({
+      user: { id: user.id, username: user.username },
+      token: tokens.accessToken,
+    });
+  } catch (error) {
+    // Token refresh failed - this is expected when token is invalid or expired
+    res.status(401).json({ error: "Invalid or expired refresh token" });
+  }
+});
+
+/**
+ * POST /api/auth/logout
+ * Logout user by clearing refresh token cookie
+ */
+router.post("/logout", (req: Request, res: Response) => {
+  res.clearCookie("refreshToken", { path: "/" });
+  res.json({ message: "Logged out successfully" });
 });
 
 /**

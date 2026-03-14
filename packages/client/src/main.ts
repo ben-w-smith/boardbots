@@ -4,6 +4,10 @@ import { GameUI } from "./gameui.js";
 import { InputHandler, type InputState } from "./input.js";
 import { GameSocket } from "./websocket.js";
 import { LobbyUI, getSavedPlayerName, savePlayerName } from "./lobby.js";
+import { authManager } from "./auth.js";
+import { LoginModal } from "./login-modal.js";
+import { DashboardUI } from "./dashboard.js";
+import { router } from "./router.js";
 import { animator } from "./animator.js";
 import { getAudioManager } from "./audio.js";
 import {
@@ -127,18 +131,42 @@ const gameUI = new GameUI({
   },
 });
 
-// Initialize lobby UI
-const lobbyUI = new LobbyUI({
+// Initialize login modal
+const loginModal = new LoginModal({
+  container: appContainer,
+  onLogin: () => {
+    // Auth state change will be picked up by authManager.subscribe
+    // which will update the UI
+  },
+});
+
+// Initialize dashboard UI
+const dashboardUI = new DashboardUI({
   container: appContainer,
   onCreateGame: async (playerName: string): Promise<string | null> => {
     currentPlayerName = playerName;
     savePlayerName(playerName);
 
     try {
-      const response = await fetch("/api/lobby/create", { method: "POST" });
+      const response = await authManager.authFetch("/api/lobby/create", { method: "POST" });
       if (response.ok) {
         const data = await response.json();
-        return data.gameCode;
+        const gameCode = data.gameCode;
+
+        // Update URL and connect to the game
+        currentGameCode = gameCode;
+        window.history.pushState({}, "", `?game=${gameCode}`);
+        socket.connect(gameCode, playerName);
+
+        // Hide dashboard and show lobby's waiting screen
+        dashboardUI.hide();
+        lobbyUI.showWaiting(gameCode);
+
+        return gameCode;
+      } else if (response.status === 401) {
+        // Not authenticated - show login modal
+        loginModal.show("login");
+        return null;
       }
     } catch (error) {
       console.error("Failed to create game:", error);
@@ -150,8 +178,13 @@ const lobbyUI = new LobbyUI({
     savePlayerName(playerName);
 
     try {
-      // Create game normally first to get game code
-      const response = await fetch("/api/lobby/create", { method: "POST" });
+      // Create game using authenticated fetch
+      const response = await authManager.authFetch("/api/lobby/create", { method: "POST" });
+      if (response.status === 401) {
+        // Not authenticated - show login modal
+        loginModal.show("login");
+        return null;
+      }
       if (response.ok) {
         const data = await response.json();
         const gameCode = data.gameCode;
@@ -180,13 +213,90 @@ const lobbyUI = new LobbyUI({
     // Connect to game
     connectToGame(gameCode, playerName);
   },
+  onLogout: () => {
+    // Show lobby after logout
+    lobbyUI.show();
+  },
+});
+
+// Initialize lobby UI (for non-authenticated users)
+const lobbyUI = new LobbyUI({
+  container: appContainer,
+  onCreateGame: async (playerName: string): Promise<string | null> => {
+    currentPlayerName = playerName;
+    savePlayerName(playerName);
+
+    try {
+      const response = await authManager.authFetch("/api/lobby/create", { method: "POST" });
+      if (response.ok) {
+        const data = await response.json();
+        return data.gameCode;
+      } else if (response.status === 401) {
+        // Not authenticated - show login modal
+        loginModal.show("login");
+        return null;
+      }
+    } catch (error) {
+      console.error("Failed to create game:", error);
+    }
+    return null;
+  },
+  onCreateAIGame: async (playerName: string, aiDepth: number): Promise<string | null> => {
+    currentPlayerName = playerName;
+    savePlayerName(playerName);
+
+    try {
+      // Create game using authenticated fetch
+      const response = await authManager.authFetch("/api/lobby/create", { method: "POST" });
+      if (response.status === 401) {
+        // Not authenticated - show login modal
+        loginModal.show("login");
+        return null;
+      }
+      if (response.ok) {
+        const data = await response.json();
+        const gameCode = data.gameCode;
+
+        // Connect to the game
+        socket.connect(gameCode, playerName);
+
+        // Wait a bit for connection to establish, then start AI game
+        setTimeout(() => {
+          socket.startAIGame(aiDepth);
+        }, 500);
+
+        return gameCode;
+      }
+    } catch (error) {
+      console.error("Failed to create AI game:", error);
+    }
+    return null;
+  },
+  onJoinGame: (gameCode: string, playerName: string) => {
+    currentPlayerName = playerName;
+    currentGameCode = gameCode;
+    savePlayerName(playerName);
+    // Update URL without reload
+    router.navigate("/game", { gameCode });
+    // Connect to game
+    connectToGame(gameCode, playerName);
+  },
   onConnectToGame: (gameCode: string, playerName: string) => {
     // Called when host creates a game - connect but keep showing lobby
     currentGameCode = gameCode;
     // Update URL without reload
-    window.history.pushState({}, "", `?game=${gameCode}`);
+    router.replace("/game", { gameCode });
     // Connect via WebSocket but don't transition to game view yet
     socket.connect(gameCode, playerName);
+  },
+  onLogin: () => {
+    loginModal.show("login");
+  },
+  onRegister: () => {
+    loginModal.show("register");
+  },
+  onGoToDashboard: () => {
+    showDashboard();
   },
 });
 
@@ -228,9 +338,10 @@ socket.onStateUpdate(
       gameUI.setPlayerIndex(myIndex);
     }
 
-    // Transition from lobby to game when phase changes to playing
+    // Transition from lobby/dashboard to game when phase changes to playing
     if (phase === "playing" || phase === "finished") {
       lobbyUI.hide();
+      dashboardUI.hide();
       gameUI.show();
     }
 
@@ -238,6 +349,7 @@ socket.onStateUpdate(
     // For AI games, transition immediately when phase becomes playing
     if (phase === "waiting" && players.length >= 2) {
       lobbyUI.hide();
+      dashboardUI.hide();
       gameUI.show();
     }
 
@@ -346,6 +458,7 @@ socket.onError((message: string) => {
 
 socket.onStatusChange((status) => {
   gameUI.setStatus(status);
+  dashboardUI.setConnectionStatus(status);
   isConnected = status === "connected";
 });
 
@@ -499,6 +612,7 @@ function startAnimationLoop(): void {
 
 // Connect to a game
 function connectToGame(gameCode: string, playerName: string) {
+  dashboardUI.hide();
   lobbyUI.hide();
   gameUI.setStatus("connecting");
   gameUI.show();
@@ -506,13 +620,42 @@ function connectToGame(gameCode: string, playerName: string) {
   render();
 }
 
+// Show dashboard for logged-in user
+async function showDashboard() {
+  const authState = authManager.getState();
+  if (authState.isAuthenticated && authState.user) {
+    lobbyUI.hide();
+    gameUI.hide();
+    await dashboardUI.show(authState.user);
+  }
+}
+
+// Show landing page (lobby) for non-authenticated user
+function showLandingPage() {
+  dashboardUI.hide();
+  gameUI.hide();
+  setupDemoState();
+  lobbyUI.show();
+}
+
 // Connect or use demo mode
-function init() {
+async function init() {
+  // Subscribe to auth state changes
+  authManager.subscribe(async () => {
+    const authState = authManager.getState();
+    if (authState.isAuthenticated && authState.user) {
+      await showDashboard();
+    } else {
+      showLandingPage();
+    }
+  });
+
   if (isDemoMode) {
     // Demo mode - just render with sample state
     setupDemoState();
     gameUI.hide();
     lobbyUI.hide();
+    dashboardUI.hide();
   } else if (currentGameCode && currentPlayerName) {
     // Game code in URL - connect directly
     connectToGame(currentGameCode, currentPlayerName);
@@ -521,10 +664,25 @@ function init() {
     currentPlayerName = generatePlayerName();
     connectToGame(currentGameCode, currentPlayerName);
   } else {
-    // No game code - show lobby
-    setupDemoState();
-    gameUI.hide();
-    lobbyUI.show();
+    // No game code - check auth state
+    const authState = authManager.getState();
+    if (authState.isAuthenticated && authState.user) {
+      // Try to refresh token first
+      const refreshed = await authManager.refreshToken();
+      if (refreshed) {
+        await showDashboard();
+      } else {
+        showLandingPage();
+      }
+    } else {
+      // Try to refresh token
+      const refreshed = await authManager.refreshToken();
+      if (refreshed && authManager.getState().user) {
+        await showDashboard();
+      } else {
+        showLandingPage();
+      }
+    }
   }
   render();
 }
@@ -650,4 +808,6 @@ Object.assign(window as unknown as Record<string, unknown>, {
   socket,
   inputHandler,
   lobbyUI,
+  dashboardUI,
+  authManager,
 });
