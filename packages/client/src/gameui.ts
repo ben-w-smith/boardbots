@@ -14,6 +14,10 @@ export interface GameUIOptions {
   onStartGame: () => void;
   /** Called when rematch is requested */
   onRematch: () => void;
+  /** Called when user wants to go to dashboard */
+  onGoToDashboard?: () => void;
+  /** Called when user wants to create a new game */
+  onNewGame?: () => void;
 }
 
 interface PlayerInfo {
@@ -29,11 +33,13 @@ export class GameUI {
   private topPanel: HTMLElement;
   private bottomPanel: HTMLElement;
   private statusPanel: HTMLElement;
-  private moveLog: HTMLElement;
+  private rightPanel: HTMLElement;
   private onMoveCallback: (move: GameMove) => void;
   private onRequestAI: () => void;
   private onStartGame: () => void;
   private onRematch: () => void;
+  private onGoToDashboard?: () => void;
+  private onNewGame?: () => void;
 
   private gameState: GameState | null = null;
   private playerNames: string[] = [];
@@ -50,20 +56,22 @@ export class GameUI {
     this.onRequestAI = options.onRequestAI;
     this.onStartGame = options.onStartGame;
     this.onRematch = options.onRematch;
+    this.onGoToDashboard = options.onGoToDashboard;
+    this.onNewGame = options.onNewGame;
 
     // Create UI panels
     this.topPanel = this.createTopPanel();
     this.bottomPanel = this.createBottomPanel();
     this.statusPanel = this.createStatusPanel();
-    this.moveLog = this.createMoveLog();
+    this.rightPanel = this.createRightPanel();
 
     this.container.appendChild(this.topPanel);
     this.container.appendChild(this.bottomPanel);
     this.container.appendChild(this.statusPanel);
-    this.container.appendChild(this.moveLog);
+    this.container.appendChild(this.rightPanel);
 
-    // Setup sound toggle button
-    this.setupSoundToggle();
+    // Setup panel button handlers
+    this.setupRightPanelHandlers();
 
     this.hide(); // Start hidden
   }
@@ -88,9 +96,6 @@ export class GameUI {
         <span class="player-score"></span>
         <span class="player-robots"></span>
       </div>
-      <button id="btn-sound-toggle" class="sound-toggle" title="Toggle Sound">
-        <span class="sound-icon">🔊</span>
-      </button>
     `;
     return panel;
   }
@@ -177,22 +182,52 @@ export class GameUI {
     return panel;
   }
 
-  private createMoveLog(): HTMLElement {
+  private createRightPanel(): HTMLElement {
     const panel = document.createElement('div');
-    panel.className = 'ui-panel move-log';
-    panel.id = 'move-log';
-    panel.innerHTML = `
-      <div class="move-log-header">Move History</div>
+    panel.className = 'ui-panel right-panel';
+    panel.id = 'right-panel';
+
+    // Tab bar
+    const tabBar = document.createElement('div');
+    tabBar.className = 'tab-bar';
+    tabBar.innerHTML = `
+      <button class="tab-btn active" data-tab="log">Move Log</button>
+      <button class="tab-btn" data-tab="options">Options</button>
+    `;
+
+    // Move log tab content
+    const logTab = document.createElement('div');
+    logTab.className = 'tab-content active';
+    logTab.dataset.tab = 'log';
+    logTab.innerHTML = `
+      <div class="move-log-header">Moves</div>
       <div class="move-log-entries" id="move-log-entries"></div>
     `;
-    Object.assign(panel.style, {
-      right: '16px',
-      top: '50%',
-      transform: 'translateY(-50%)',
-      maxHeight: '60vh',
-      width: '200px',
-      overflow: 'hidden',
+
+    // Options tab content
+    const optionsTab = document.createElement('div');
+    optionsTab.className = 'tab-content';
+    optionsTab.dataset.tab = 'options';
+    optionsTab.innerHTML = `
+      <button id="btn-resign" class="danger action-btn option-row">Resign</button>
+      <button id="btn-sound" class="action-btn option-row">🔊 Sound</button>
+    `;
+
+    panel.appendChild(tabBar);
+    panel.appendChild(logTab);
+    panel.appendChild(optionsTab);
+
+    // Tab switching
+    tabBar.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest('.tab-btn') as HTMLElement;
+      if (!btn) return;
+      const tabName = btn.dataset.tab;
+      tabBar.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      panel.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      panel.querySelector(`.tab-content[data-tab="${tabName}"]`)?.classList.add('active');
     });
+
     return panel;
   }
 
@@ -237,26 +272,27 @@ export class GameUI {
     });
   }
 
-  /** Setup sound toggle button in top panel */
-  private setupSoundToggle(): void {
-    const btnSoundToggle = this.topPanel.querySelector('#btn-sound-toggle');
-    const soundIcon = btnSoundToggle?.querySelector('.sound-icon');
+  private setupRightPanelHandlers(): void {
+    const btnResign = this.rightPanel.querySelector('#btn-resign');
+    const btnSound = this.rightPanel.querySelector('#btn-sound');
 
-    const updateSoundIcon = (isMuted: boolean) => {
-      if (soundIcon) {
-        soundIcon.textContent = isMuted ? '🔇' : '🔊';
-      }
-    };
+    btnResign?.addEventListener('click', () => {
+      // TODO: Implement resign functionality
+      console.log('Resign button clicked');
+    });
 
-    btnSoundToggle?.addEventListener('click', () => {
+    btnSound?.addEventListener('click', () => {
       // Dispatch custom event for main.ts to handle
       const event = new CustomEvent('soundToggle');
       window.dispatchEvent(event);
     });
 
-    // Listen for sound state changes
+    // Listen for sound state changes to update button
     window.addEventListener('soundStateChanged', ((e: CustomEvent) => {
-      updateSoundIcon(e.detail.isMuted);
+      const isMuted = e.detail.isMuted;
+      if (btnSound) {
+        btnSound.textContent = isMuted ? '🔇 Sound' : '🔊 Sound';
+      }
     }) as EventListener);
   }
 
@@ -403,6 +439,7 @@ export class GameUI {
     // Add button handlers
     const rematchBtn = overlay.querySelector('#victory-rematch');
     const newGameBtn = overlay.querySelector('#victory-new-game');
+    const dashboardBtn = overlay.querySelector('#victory-dashboard');
 
     rematchBtn?.addEventListener('click', () => {
       this.hideGameOver();
@@ -411,8 +448,25 @@ export class GameUI {
 
     newGameBtn?.addEventListener('click', () => {
       this.hideGameOver();
-      window.history.pushState({}, '', window.location.pathname);
-      window.location.reload();
+      if (this.onNewGame) {
+        this.onNewGame();
+      } else {
+        // Fallback: go to dashboard or reload
+        if (this.onGoToDashboard) {
+          this.onGoToDashboard();
+        } else {
+          window.location.href = '/';
+        }
+      }
+    });
+
+    dashboardBtn?.addEventListener('click', () => {
+      this.hideGameOver();
+      if (this.onGoToDashboard) {
+        this.onGoToDashboard();
+      } else {
+        window.location.href = '/dashboard';
+      }
     });
 
     // Animate in
@@ -441,14 +495,14 @@ export class GameUI {
   show(): void {
     this.topPanel.style.display = 'flex';
     this.bottomPanel.style.display = 'flex';
-    this.moveLog.style.display = 'block';
+    this.rightPanel.style.display = 'flex';
   }
 
   /** Hide the UI */
   hide(): void {
     this.topPanel.style.display = 'none';
     this.bottomPanel.style.display = 'none';
-    this.moveLog.style.display = 'none';
+    this.rightPanel.style.display = 'none';
     this.statusPanel.style.display = 'none';
   }
 
@@ -564,7 +618,7 @@ export class GameUI {
   }
 
   private renderMoveLog(): void {
-    const entriesEl = this.moveLog.querySelector('#move-log-entries');
+    const entriesEl = this.rightPanel.querySelector('#move-log-entries');
     if (!entriesEl) return;
 
     entriesEl.innerHTML = this.moveHistory

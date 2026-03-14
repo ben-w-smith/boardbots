@@ -511,7 +511,7 @@ button.tertiary:hover {
     font-size: 13px;
   }
 
-  .move-log {
+  .right-panel {
     display: none !important;
   }
 
@@ -1057,10 +1057,8 @@ button.success {
 
 /* Desktop (default) - board centered, HUD panels on sides */
 @media (min-width: 1200px) {
-  .move-log {
+  .right-panel {
     right: 24px !important;
-    top: 50% !important;
-    transform: translateY(-50%) !important;
   }
 
   /* Desktop board container - generous spacing */
@@ -1091,14 +1089,13 @@ button.success {
     font-weight: 600;
   }
 
-  .move-log {
+  .right-panel {
     position: fixed !important;
     bottom: 80px !important;
     top: auto !important;
     right: 16px !important;
     left: 16px !important;
-    transform: none !important;
-    width: auto !important;
+    height: 150px !important;
     max-height: 150px !important;
   }
 
@@ -1179,7 +1176,7 @@ button.success {
   #btn-advance::before { content: '↑'; font-size: 18px; }
   #btn-cancel::before { content: '✕'; font-size: 18px; }
 
-  .move-log {
+  .right-panel {
     display: none !important;
   }
 
@@ -1831,6 +1828,89 @@ button.success {
     width: 100%;
     min-height: 44px;
   }
+}
+
+/* ========================================
+   Right Panel Tabs
+   ======================================== */
+.right-panel {
+  position: absolute;
+  right: 16px;
+  top: 100px;
+  bottom: 80px;
+  width: 200px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+
+.tab-bar {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: var(--space-sm);
+  background: var(--color-bg-surface-alpha);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: var(--space-sm) var(--space-md);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-radius: 0;
+}
+
+.tab-btn:hover {
+  color: var(--color-text-secondary);
+}
+
+.tab-btn.active {
+  color: var(--color-accent);
+  border-bottom-color: var(--color-accent);
+}
+
+.tab-content {
+  display: none;
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-md);
+}
+
+.tab-content.active {
+  display: flex;
+  flex-direction: column;
+}
+
+.option-row {
+  width: 100%;
+  margin-bottom: var(--space-sm);
+}
+
+/* Move log within right panel */
+.move-log-header {
+  font-weight: 600;
+  margin-bottom: var(--space-sm);
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--color-border);
+  font-size: 14px;
+}
+
+.move-log-entries {
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* Override old move-log positioning since right panel is now absolutely positioned */
+.move-log {
+  /* Styles moved to .right-panel */
 }
 
 /* Touch-friendly dashboard buttons */
