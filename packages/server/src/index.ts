@@ -16,6 +16,9 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const port = process.env.PORT || 3000;
 
+// Trust proxy for rate limiting behind nginx/Docker
+app.set("trust proxy", 1);
+
 // Security headers
 // Note: HSTS and upgrade-insecure-requests disabled until HTTPS is configured
 app.use(helmet({
