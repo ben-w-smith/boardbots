@@ -11,3 +11,7 @@ The primary source of truth for the project context, architecture, tech stack, a
 ## Editing Context
 
 When editing files inside `packages/engine/`, `packages/server/`, or `packages/client/`, you must read the `AGENTS.md` file located inside that directory for highly specific, domain-level friction points and architectural patterns.
+
+## Agent Teams (Experimental)
+
+@import .claude/agent-teams/instructions.md

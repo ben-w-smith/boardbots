@@ -346,8 +346,13 @@ export class GameRoom {
   }
 
   private async handleStartAIGame(ws: WebSocket, aiDepth: number): Promise<void> {
+    console.log(`[AI Game] handleStartAIGame called, aiDepth=${aiDepth}`);
     const attachment = this.sessions.get(ws);
+    console.log(`[AI Game] attachment:`, attachment ? { playerName: attachment.playerName, isSpectator: attachment.isSpectator } : null);
+    console.log(`[AI Game] hostName: ${this.persisted.hostName}`);
+
     if (!attachment || attachment.isSpectator) {
+      console.log(`[AI Game] Rejected: not a player`);
       this.sendTo(ws, {
         type: "error",
         message: "Only players can start the game",
@@ -356,6 +361,7 @@ export class GameRoom {
     }
 
     if (this.persisted.hostName !== attachment.playerName) {
+      console.log(`[AI Game] Rejected: not the host`);
       this.sendTo(ws, {
         type: "error",
         message: "Only the host can start the game",

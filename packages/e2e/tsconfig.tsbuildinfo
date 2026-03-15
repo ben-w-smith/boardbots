@@ -1,0 +1,1 @@
+{"root":["./playwright.config.ts","./fixtures/game.ts","./helpers/auth.ts","./helpers/constants.ts","./helpers/game.ts","./helpers/lobby.ts","./tests/ai-game.spec.ts","./tests/auth.spec.ts","./tests/gameplay.spec.ts","./tests/lobby.spec.ts","./tests/multiplayer.spec.ts"],"version":"5.9.3"}

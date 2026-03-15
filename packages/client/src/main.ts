@@ -264,10 +264,10 @@ const dashboardUI = new DashboardUI({
         // Connect to the game
         socket.connect(gameCode, playerName);
 
-        // Wait a bit for connection to establish, then start AI game
+        // Wait for connection to establish and join to process, then start AI game
         setTimeout(() => {
           socket.startAIGame(aiDepth);
-        }, 500);
+        }, 1000);
 
         return gameCode;
       }
@@ -339,10 +339,10 @@ const lobbyUI = new LobbyUI({
         // Connect to the game
         socket.connect(gameCode, playerName);
 
-        // Wait a bit for connection to establish, then start AI game
+        // Wait for connection to establish and join to process, then start AI game
         setTimeout(() => {
           socket.startAIGame(aiDepth);
-        }, 500);
+        }, 1000);
 
         return gameCode;
       }

@@ -1,0 +1,20 @@
+{
+  "_comment": "Template for enabling agent teams. Copy relevant sections to settings.local.json",
+
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
+
+  "teammateMode": "auto",
+
+  "_teammateMode_options": {
+    "auto": "Uses split panes if in tmux, otherwise in-process",
+    "in-process": "All teammates in main terminal (Shift+Down to cycle)",
+    "tmux": "Each teammate gets its own pane (requires tmux or iTerm2)"
+  },
+
+  "_hooks_for_teams": {
+    "TeammateIdle": "Runs when a teammate is about to go idle. Exit code 2 to send feedback.",
+    "TaskCompleted": "Runs when a task is being marked complete. Exit code 2 to prevent completion."
+  }
+}

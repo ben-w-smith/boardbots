@@ -85,7 +85,12 @@ export class GameSocket {
     // Use production API URL if configured, otherwise use current host
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = this.baseUrl || (typeof __PRODUCTION_API_URL__ !== 'undefined' && __PRODUCTION_API_URL__ ? __PRODUCTION_API_URL__ : window.location.host);
-    const wsUrl = `${protocol}//${host}/api/game/${this.gameCode}`;
+
+    // Get auth token from localStorage (set by authManager)
+    const token = localStorage.getItem('lockitdown_token');
+    const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
+
+    const wsUrl = `${protocol}//${host}/api/game/${this.gameCode}${tokenParam}`;
 
     try {
       this.ws = new WebSocket(wsUrl);
