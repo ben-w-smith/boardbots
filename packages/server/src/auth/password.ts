@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 
-const SALT_ROUNDS = 10;
+const SALT_ROUNDS = 12; // Increased from 10 for stronger security
 
 /**
  * Hash a plaintext password using bcrypt

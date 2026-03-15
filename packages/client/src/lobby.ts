@@ -531,7 +531,7 @@ export class LobbyUI {
 
         <div class="lobby-form">
           <div class="game-code-display">
-            <span class="game-code">${this.gameCode || '------'}</span>
+            <span class="game-code">${this.escapeHtml(this.gameCode || '------')}</span>
           </div>
 
           <div class="lobby-buttons">
@@ -595,5 +595,12 @@ export class LobbyUI {
       return false;
     }
     return true;
+  }
+
+  /** Escape HTML for safe rendering */
+  private escapeHtml(text: string): string {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   }
 }

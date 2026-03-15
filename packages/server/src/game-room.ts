@@ -69,6 +69,8 @@ interface WSAttachment {
   playerIndex: number;
   isSpectator: boolean;
   user?: JwtPayload | null;
+  // Rate limiting
+  messageTimestamps: number[];
 }
 
 export class GameRoom {
@@ -124,7 +126,39 @@ export class GameRoom {
     this.sendTo(ws, this.buildGameStateMessage());
   }
 
+  // Rate limiting constants
+  private static readonly RATE_LIMIT_WINDOW_MS = 1000; // 1 second
+  private static readonly RATE_LIMIT_MAX_MESSAGES = 20; // Max 20 messages per second
+
+  private isRateLimited(ws: WebSocket): boolean {
+    const attachment = this.sessions.get(ws);
+    if (!attachment) return true;
+
+    const now = Date.now();
+    const timestamps = attachment.messageTimestamps;
+
+    // Remove timestamps older than the window
+    while (timestamps.length > 0 && timestamps[0] < now - GameRoom.RATE_LIMIT_WINDOW_MS) {
+      timestamps.shift();
+    }
+
+    // Check if rate limited
+    if (timestamps.length >= GameRoom.RATE_LIMIT_MAX_MESSAGES) {
+      return true;
+    }
+
+    // Add current timestamp
+    timestamps.push(now);
+    return false;
+  }
+
   private async handleMessage(ws: WebSocket, message: string): Promise<void> {
+    // Rate limiting check
+    if (this.isRateLimited(ws)) {
+      this.sendTo(ws, { type: "error", message: "Too many messages. Please slow down." });
+      return;
+    }
+
     let msg: ClientMessage;
     try {
       msg = JSON.parse(message) as ClientMessage;
@@ -209,6 +243,7 @@ export class GameRoom {
         playerIndex: existingPlayer.index,
         isSpectator: false,
         user: user || null,
+        messageTimestamps: [],
       });
 
       this.saveState();
@@ -229,6 +264,7 @@ export class GameRoom {
         playerIndex: -1,
         isSpectator: true,
         user: user || null,
+        messageTimestamps: [],
       });
 
       this.sendTo(ws, {
@@ -262,6 +298,7 @@ export class GameRoom {
       playerIndex,
       isSpectator: false,
       user: user || null,
+      messageTimestamps: [],
     });
 
     this.saveState();

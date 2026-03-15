@@ -10,6 +10,47 @@ declare global {
   }
 }
 
+// Allowed origins for CSRF protection
+const ALLOWED_ORIGINS = [
+  "http://138.197.0.105",
+  "http://boardbots.benwsmith.com",
+  "https://boardbots.benwsmith.com",
+];
+
+/**
+ * CSRF protection middleware
+ * Validates Origin header on state-changing requests
+ */
+export function csrfProtection(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void {
+  // Only check on state-changing methods
+  if (!["POST", "PUT", "DELETE", "PATCH"].includes(req.method)) {
+    next();
+    return;
+  }
+
+  const origin = req.headers.origin;
+  const host = req.headers.host;
+
+  // Allow requests with no origin (mobile apps, curl, etc.)
+  // but validate if origin is present
+  if (origin) {
+    const isAllowed = ALLOWED_ORIGINS.includes(origin) ||
+      // Allow any localhost port for development
+      /^http:\/\/localhost:\d+$/.test(origin);
+
+    if (!isAllowed) {
+      res.status(403).json({ error: "Invalid origin" });
+      return;
+    }
+  }
+
+  next();
+}
+
 /**
  * Authentication middleware
  * Verifies JWT token and attaches user to request

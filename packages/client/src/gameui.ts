@@ -629,7 +629,7 @@ export class GameUI {
 
     entriesEl.innerHTML = this.moveHistory
       .slice(-20) // Last 20 moves
-      .map((move, i) => `<div class="move-entry">${this.moveHistory.length - this.moveHistory.slice(-20).length + i + 1}. ${move}</div>`)
+      .map((move, i) => `<div class="move-entry">${this.moveHistory.length - this.moveHistory.slice(-20).length + i + 1}. ${this.escapeHtml(move)}</div>`)
       .join('');
 
     // Scroll to bottom
@@ -655,5 +655,12 @@ export class GameUI {
     }
 
     return infos;
+  }
+
+  /** Escape HTML for safe rendering */
+  private escapeHtml(text: string): string {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   }
 }

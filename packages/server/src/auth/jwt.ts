@@ -6,6 +6,36 @@ const JWT_SECRET = process.env.JWT_SECRET || DEFAULT_SECRET;
 const JWT_EXPIRES_IN = "15m"; // Short-lived access tokens
 const REFRESH_TOKEN_EXPIRES_IN = "7d"; // Long-lived refresh tokens
 
+// Token revocation blacklist (in-memory, clears on server restart)
+const revokedTokens = new Map<string, number>();
+const REVOCATION_CLEANUP_INTERVAL = 60 * 60 * 1000; // 1 hour
+
+// Periodic cleanup of expired revocations
+setInterval(() => {
+  const now = Date.now();
+  for (const [tokenId, expiry] of revokedTokens) {
+    if (expiry < now) {
+      revokedTokens.delete(tokenId);
+    }
+  }
+}, REVOCATION_CLEANUP_INTERVAL);
+
+/**
+ * Revoke a refresh token by its ID
+ */
+export function revokeToken(tokenId: string): void {
+  // Store with expiry time (7 days in ms)
+  const expiry = Date.now() + 7 * 24 * 60 * 60 * 1000;
+  revokedTokens.set(tokenId, expiry);
+}
+
+/**
+ * Check if a token ID has been revoked
+ */
+export function isTokenRevoked(tokenId: string): boolean {
+  return revokedTokens.has(tokenId);
+}
+
 /**
  * Validate JWT_SECRET configuration.
  * Throws in production if JWT_SECRET is not set.
@@ -84,13 +114,17 @@ export function generateRefreshToken(payload: JwtPayload): string {
 
 /**
  * Verify a refresh token
- * Returns null if token is invalid or not a refresh token
+ * Returns null if token is invalid, revoked, or not a refresh token
  */
 export function verifyRefreshToken(token: string): (JwtPayload & { tokenId: string }) | null {
   try {
     const payload = jwt.verify(token, JWT_SECRET) as JwtPayload & { tokenId: string; type?: string };
     // Ensure this is a refresh token
     if (payload.type !== "refresh") {
+      return null;
+    }
+    // Check if token has been revoked
+    if (isTokenRevoked(payload.tokenId)) {
       return null;
     }
     return { userId: payload.userId, username: payload.username, tokenId: payload.tokenId };

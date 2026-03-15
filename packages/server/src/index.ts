@@ -7,7 +7,7 @@ import cookieParser from "cookie-parser";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { RoomManager } from "./RoomManager.js";
-import { authRoutes, verifyToken, validateJwtSecret, requireAuth } from "./auth/index.js";
+import { authRoutes, verifyToken, validateJwtSecret, requireAuth, csrfProtection } from "./auth/index.js";
 import { dbService } from "./db.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -57,6 +57,9 @@ app.use(cors({
 
 app.use(express.json());
 app.use(cookieParser());
+
+// CSRF protection for state-changing requests
+app.use(csrfProtection);
 
 const clientDistPath = path.join(__dirname, "../../client/dist");
 app.use(express.static(clientDistPath));

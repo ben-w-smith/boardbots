@@ -6,7 +6,7 @@ import {
   validatePassword,
   validatePasswordStrength,
 } from "./password.js";
-import { generateToken, generateTokenPair, verifyRefreshToken, JwtPayload } from "./jwt.js";
+import { generateToken, generateTokenPair, verifyRefreshToken, revokeToken, JwtPayload } from "./jwt.js";
 import { requireAuth } from "./middleware.js";
 import { loginLimiter, registerLimiter } from "./rate-limiter.js";
 
@@ -226,9 +226,19 @@ router.post("/refresh", async (req: Request, res: Response) => {
 
 /**
  * POST /api/auth/logout
- * Logout user by clearing refresh token cookie
+ * Logout user by revoking refresh token and clearing cookie
  */
 router.post("/logout", (req: Request, res: Response) => {
+  const refreshToken = req.cookies?.refreshToken;
+
+  // Revoke the token if it exists
+  if (refreshToken) {
+    const payload = verifyRefreshToken(refreshToken);
+    if (payload?.tokenId) {
+      revokeToken(payload.tokenId);
+    }
+  }
+
   res.clearCookie("refreshToken", { path: "/" });
   res.json({ message: "Logged out successfully" });
 });
