@@ -119,7 +119,9 @@ export class DashboardUI {
       console.error('Failed to load dashboard data:', error);
       if (this.state) {
         this.state.isLoading = false;
+        this.state.games = []; // Ensure empty array, not stale data
         this.render();
+        this.showError('Failed to load game history. Please try again.');
       }
     }
   }
@@ -275,7 +277,8 @@ export class DashboardUI {
     }
 
     // Separate games by status and phase
-    const activeGames = games.filter((g) => g.status === 'active' && g.phase !== 'finished');
+    // Handle missing status field gracefully - treat undefined as 'active'
+    const activeGames = games.filter((g) => (g.status === 'active' || !g.status) && g.phase !== 'finished');
     const cancelledGames = games.filter((g) => g.status === 'cancelled');
     const completedGames = games.filter((g) => (g.status === 'completed' || g.status === 'active') && g.phase === 'finished');
     const archivedGames = games.filter((g) => g.status === 'archived');

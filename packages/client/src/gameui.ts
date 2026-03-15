@@ -14,6 +14,8 @@ export interface GameUIOptions {
   onStartGame: () => void;
   /** Called when rematch is requested */
   onRematch: () => void;
+  /** Called when user resigns */
+  onResign: () => void;
   /** Called when user wants to go to dashboard */
   onGoToDashboard?: () => void;
   /** Called when user wants to create a new game */
@@ -38,6 +40,7 @@ export class GameUI {
   private onRequestAI: () => void;
   private onStartGame: () => void;
   private onRematch: () => void;
+  private onResign: () => void;
   private onGoToDashboard?: () => void;
   private onNewGame?: () => void;
 
@@ -56,6 +59,7 @@ export class GameUI {
     this.onRequestAI = options.onRequestAI;
     this.onStartGame = options.onStartGame;
     this.onRematch = options.onRematch;
+    this.onResign = options.onResign;
     this.onGoToDashboard = options.onGoToDashboard;
     this.onNewGame = options.onNewGame;
 
@@ -277,8 +281,10 @@ export class GameUI {
     const btnSound = this.rightPanel.querySelector('#btn-sound');
 
     btnResign?.addEventListener('click', () => {
-      // TODO: Implement resign functionality
-      console.log('Resign button clicked');
+      // Confirm before resigning
+      if (confirm('Are you sure you want to resign? This will end the game.')) {
+        this.onResign();
+      }
     });
 
     btnSound?.addEventListener('click', () => {

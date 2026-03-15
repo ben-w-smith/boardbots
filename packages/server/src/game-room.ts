@@ -43,6 +43,7 @@ type ClientMessage =
   | { type: "startGame" }
   | { type: "startAIGame"; aiDepth: number }
   | { type: "rematch" }
+  | { type: "resign" }
   | { type: "requestAI" }
   | { type: "ping" };
 
@@ -147,6 +148,9 @@ export class GameRoom {
         break;
       case "rematch":
         await this.handleRematch(ws);
+        break;
+      case "resign":
+        await this.handleResign(ws);
         break;
       case "requestAI":
         await this.handleRequestAI(ws);
@@ -452,6 +456,46 @@ export class GameRoom {
 
     this.saveState();
     this.broadcastGameState();
+  }
+
+  private async handleResign(ws: WebSocket): Promise<void> {
+    if (this.persisted.phase !== "playing" || !this.persisted.gameState) {
+      this.sendTo(ws, { type: "error", message: "Game not in progress" });
+      return;
+    }
+
+    const attachment = this.sessions.get(ws);
+    if (!attachment || attachment.isSpectator) {
+      this.sendTo(ws, {
+        type: "error",
+        message: "Only players can resign",
+      });
+      return;
+    }
+
+    // The resigning player loses - opponent wins
+    const resigningPlayer = attachment.playerIndex;
+    const winnerIndex = resigningPlayer === 0 ? 1 : 0;
+
+    this.persisted.phase = "finished";
+    const winnerPlayer = Array.from(this.persisted.players.values()).find(
+      (p) => p.index === winnerIndex,
+    );
+    const winnerName = winnerPlayer?.name ?? "Unknown";
+
+    // Find the WebSocket for the winner and get their userId
+    const winnerSession = Array.from(this.sessions.entries()).find(
+      ([, att]) => att.playerName === winnerName && att.user,
+    );
+
+    if (winnerSession && winnerSession[1].user) {
+      this.persisted.winnerId = winnerSession[1].user.userId;
+      dbService.updateGameWinner(this.gameCode, winnerSession[1].user.userId);
+    }
+
+    this.saveState();
+    this.broadcastGameState();
+    this.broadcast({ type: "gameOver", winner: winnerIndex, winnerName });
   }
 
   /**

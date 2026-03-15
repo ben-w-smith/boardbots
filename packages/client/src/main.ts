@@ -130,13 +130,18 @@ const gameUI = new GameUI({
     gameUI.hideGameOver();
     resetGame();
   },
+  onResign: () => {
+    socket.resign();
+  },
   onGoToDashboard: () => {
     showDashboard();
   },
   onNewGame: async () => {
     // Create a new game and connect to it
     try {
-      const response = await authManager.authFetch("/api/lobby/create", { method: "POST" });
+      const response = await authManager.authFetch("/api/lobby/create", {
+        method: "POST",
+      });
       if (response.ok) {
         const data = await response.json();
         const gameCode = data.gameCode;
@@ -149,7 +154,10 @@ const gameUI = new GameUI({
         router.navigate("/game", { gameCode });
 
         // Use the current player name or the logged-in user's name
-        const playerName = currentPlayerName || authManager.getState().user?.username || generatePlayerName();
+        const playerName =
+          currentPlayerName ||
+          authManager.getState().user?.username ||
+          generatePlayerName();
         socket.connect(gameCode, playerName);
 
         // Show lobby waiting screen
@@ -178,17 +186,17 @@ const loginModal = new LoginModal({
 // Initialize top bar navigation
 const topBar = new TopBar({
   container: appContainer,
-  onNavigate: (route: 'home' | 'dashboard') => {
-    if (route === 'home') {
+  onNavigate: (route: "home" | "dashboard") => {
+    if (route === "home") {
       // Show lobby (landing page)
       showLandingPage();
-    } else if (route === 'dashboard') {
+    } else if (route === "dashboard") {
       // Show dashboard (requires auth)
       showDashboard();
     }
   },
   onLogin: () => {
-    loginModal.show('login');
+    loginModal.show("login");
   },
   onLogout: () => {
     authManager.logout();
@@ -205,7 +213,9 @@ const dashboardUI = new DashboardUI({
     savePlayerName(playerName);
 
     try {
-      const response = await authManager.authFetch("/api/lobby/create", { method: "POST" });
+      const response = await authManager.authFetch("/api/lobby/create", {
+        method: "POST",
+      });
       if (response.ok) {
         const data = await response.json();
         const gameCode = data.gameCode;
@@ -230,13 +240,18 @@ const dashboardUI = new DashboardUI({
     }
     return null;
   },
-  onCreateAIGame: async (playerName: string, aiDepth: number): Promise<string | null> => {
+  onCreateAIGame: async (
+    playerName: string,
+    aiDepth: number,
+  ): Promise<string | null> => {
     currentPlayerName = playerName;
     savePlayerName(playerName);
 
     try {
       // Create game using authenticated fetch
-      const response = await authManager.authFetch("/api/lobby/create", { method: "POST" });
+      const response = await authManager.authFetch("/api/lobby/create", {
+        method: "POST",
+      });
       if (response.status === 401) {
         // Not authenticated - show login modal
         loginModal.show("login");
@@ -284,7 +299,9 @@ const lobbyUI = new LobbyUI({
     savePlayerName(playerName);
 
     try {
-      const response = await authManager.authFetch("/api/lobby/create", { method: "POST" });
+      const response = await authManager.authFetch("/api/lobby/create", {
+        method: "POST",
+      });
       if (response.ok) {
         const data = await response.json();
         return data.gameCode;
@@ -298,13 +315,18 @@ const lobbyUI = new LobbyUI({
     }
     return null;
   },
-  onCreateAIGame: async (playerName: string, aiDepth: number): Promise<string | null> => {
+  onCreateAIGame: async (
+    playerName: string,
+    aiDepth: number,
+  ): Promise<string | null> => {
     currentPlayerName = playerName;
     savePlayerName(playerName);
 
     try {
       // Create game using authenticated fetch
-      const response = await authManager.authFetch("/api/lobby/create", { method: "POST" });
+      const response = await authManager.authFetch("/api/lobby/create", {
+        method: "POST",
+      });
       if (response.status === 401) {
         // Not authenticated - show login modal
         loginModal.show("login");
@@ -356,7 +378,13 @@ const lobbyUI = new LobbyUI({
 
 // Set up WebSocket callbacks
 socket.onStateUpdate(
-  (transportState: TransportState | null, players: string[], phase: string, aiEnabled?: boolean, aiPlayerIndex?: number) => {
+  (
+    transportState: TransportState | null,
+    players: string[],
+    phase: string,
+    aiEnabled?: boolean,
+    aiPlayerIndex?: number,
+  ) => {
     currentPlayers = players;
     currentPhase = phase;
 
@@ -381,7 +409,13 @@ socket.onStateUpdate(
 
       inputHandler.setGameState(state);
       inputState = inputHandler.getState(); // Sync global inputState with updated selection
-      gameUI.updateFromTransport(transportState, players, phase, aiEnabled, aiPlayerIndex);
+      gameUI.updateFromTransport(
+        transportState,
+        players,
+        phase,
+        aiEnabled,
+        aiPlayerIndex,
+      );
     }
 
     // Find my player index
@@ -396,6 +430,7 @@ socket.onStateUpdate(
     if (phase === "playing" || phase === "finished") {
       lobbyUI.hide();
       dashboardUI.hide();
+      topBar.hide();
       gameUI.show();
     }
 
@@ -404,6 +439,7 @@ socket.onStateUpdate(
     if (phase === "waiting" && players.length >= 2) {
       lobbyUI.hide();
       dashboardUI.hide();
+      topBar.hide();
       gameUI.show();
     }
 
@@ -679,8 +715,10 @@ function connectToGame(gameCode: string, playerName: string) {
 async function showDashboard() {
   const authState = authManager.getState();
   if (authState.isAuthenticated && authState.user) {
+    socket.disconnect(); // Stop receiving state updates from old game
+    resetGame();
     topBar.show();
-    topBar.setActive('dashboard');
+    topBar.setActive("dashboard");
     topBar.update();
     lobbyUI.hide();
     gameUI.hide();
@@ -690,8 +728,9 @@ async function showDashboard() {
 
 // Show landing page (lobby) for non-authenticated user
 function showLandingPage() {
+  socket.disconnect(); // Stop receiving state updates from old game
   topBar.show();
-  topBar.setActive('home');
+  topBar.setActive("home");
   topBar.update();
   dashboardUI.hide();
   gameUI.hide();
@@ -811,7 +850,9 @@ canvas.addEventListener("contextmenu", handleContextMenu);
 window.addEventListener("soundToggle", () => {
   const isMuted = audioManager.toggleMute();
   // Dispatch event to update UI
-  window.dispatchEvent(new CustomEvent("soundStateChanged", { detail: { isMuted } }));
+  window.dispatchEvent(
+    new CustomEvent("soundStateChanged", { detail: { isMuted } }),
+  );
 });
 
 // Keyboard shortcuts
@@ -845,7 +886,9 @@ document.addEventListener("keydown", (event) => {
     case "M":
       // Toggle sound with M key
       const isMuted = audioManager.toggleMute();
-      window.dispatchEvent(new CustomEvent("soundStateChanged", { detail: { isMuted } }));
+      window.dispatchEvent(
+        new CustomEvent("soundStateChanged", { detail: { isMuted } }),
+      );
       break;
   }
 });

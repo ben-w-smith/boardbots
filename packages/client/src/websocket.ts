@@ -261,6 +261,11 @@ export class GameSocket {
     this.send({ type: 'rematch' });
   }
 
+  /** Resign from the current game */
+  resign(): void {
+    this.send({ type: 'resign' });
+  }
+
   /** Start an AI game with specified difficulty */
   startAIGame(aiDepth: number): void {
     this.send({ type: 'startAIGame', aiDepth });
