@@ -41,6 +41,8 @@ export class GameSocket {
   private _status: ConnectionStatus = 'disconnected';
   private wasEverConnected = false;
   private pingInterval: ReturnType<typeof setInterval> | null = null;
+  private pendingAIGameDepth: number | null = null;
+  private pendingAIGameTimeout: ReturnType<typeof setTimeout> | null = null;
 
   // Callbacks
   private onStateUpdateCallback: ((state: TransportState | null, players: string[], phase: string, aiEnabled?: boolean, aiPlayerIndex?: number) => void) | null = null;
@@ -166,6 +168,16 @@ export class GameSocket {
       case 'gameState':
         if (msg.players && msg.phase) {
           this.onStateUpdateCallback?.(msg.state ?? null, msg.players, msg.phase, msg.aiEnabled, msg.aiPlayerIndex);
+          // Check for pending AI game start - player is confirmed when their name is in the list
+          if (this.pendingAIGameDepth !== null && msg.players.includes(this.playerName)) {
+            const depth = this.pendingAIGameDepth;
+            this.pendingAIGameDepth = null;
+            if (this.pendingAIGameTimeout) {
+              clearTimeout(this.pendingAIGameTimeout);
+              this.pendingAIGameTimeout = null;
+            }
+            this.startAIGame(depth);
+          }
         }
         break;
       case 'error':
@@ -237,6 +249,11 @@ export class GameSocket {
       clearTimeout(this.reconnectStatusTimeout);
       this.reconnectStatusTimeout = null;
     }
+    if (this.pendingAIGameTimeout) {
+      clearTimeout(this.pendingAIGameTimeout);
+      this.pendingAIGameTimeout = null;
+    }
+    this.pendingAIGameDepth = null;
     this.reconnectAttempts = this.maxReconnectAttempts; // Prevent auto-reconnect
     this.wasEverConnected = false;
     if (this.ws) {
@@ -276,9 +293,28 @@ export class GameSocket {
     this.send({ type: 'startAIGame', aiDepth });
   }
 
-  private send(msg: unknown): void {
+  /** Start an AI game once join is confirmed (waits for gameState with player in list) */
+  startAIGameWhenJoined(aiDepth: number): void {
+    this.pendingAIGameDepth = aiDepth;
+    // Clear any existing timeout
+    if (this.pendingAIGameTimeout) {
+      clearTimeout(this.pendingAIGameTimeout);
+    }
+    // 10 second timeout fallback
+    this.pendingAIGameTimeout = setTimeout(() => {
+      if (this.pendingAIGameDepth !== null) {
+        this.pendingAIGameDepth = null;
+        this.onErrorCallback?.('Failed to start AI game: join confirmation timed out');
+      }
+    }, 10000);
+  }
+
+  private send(msg: unknown): void{
+    console.log("[WebSocket] Sending message:", JSON.stringify(msg));
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(msg));
+    } else {
+      console.warn("[WebSocket] Cannot send - readyState:", this.ws?.readyState);
     }
   }
 
