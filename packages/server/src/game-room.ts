@@ -153,17 +153,17 @@ export class GameRoom {
   }
 
   private async handleMessage(ws: WebSocket, message: string): Promise<void> {
-    // Rate limiting check
-    if (this.isRateLimited(ws)) {
-      this.sendTo(ws, { type: "error", message: "Too many messages. Please slow down." });
-      return;
-    }
-
     let msg: ClientMessage;
     try {
       msg = JSON.parse(message) as ClientMessage;
     } catch {
       this.sendTo(ws, { type: "error", message: "Invalid JSON" });
+      return;
+    }
+
+    // Rate limiting check - skip for join messages (they create the session)
+    if (msg.type !== "join" && this.isRateLimited(ws)) {
+      this.sendTo(ws, { type: "error", message: "Too many messages. Please slow down." });
       return;
     }
 
