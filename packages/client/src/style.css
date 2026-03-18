@@ -175,6 +175,36 @@ body {
   font-weight: 700;
 }
 
+/* Mobile topbar adjustments */
+@media (max-width: 768px) {
+  .topbar {
+    padding: 0 var(--space-md);
+  }
+
+  .topbar-logo {
+    font-size: 16px;
+  }
+
+  .topbar-nav {
+    gap: var(--space-sm);
+  }
+
+  .topbar-link {
+    padding: var(--space-xs) var(--space-sm);
+    font-size: 13px;
+  }
+
+  .topbar-user {
+    gap: var(--space-xs);
+  }
+
+  .topbar-avatar {
+    width: 28px;
+    height: 28px;
+    font-size: 12px;
+  }
+}
+
 /* Board container - positioned to leave room for UI panels */
 #board-container {
   position: absolute;
@@ -518,6 +548,12 @@ button.tertiary:hover {
   .top-panel {
     flex-direction: column;
     gap: 8px;
+    top: calc(var(--topbar-height) + var(--space-sm));
+    left: var(--space-sm);
+    right: var(--space-sm);
+    transform: none;
+    width: auto;
+    max-width: calc(100vw - var(--space-md));
   }
 
   .player-info {
@@ -532,7 +568,7 @@ button.tertiary:hover {
   /* Adjust board container for mobile */
   #board-container {
     /* Smaller top/bottom padding on mobile */
-    top: 120px;
+    top: 140px;
     bottom: 100px;
     /* Full width on mobile (no move log) */
     left: 8px;
@@ -831,6 +867,27 @@ button.success {
   }
 }
 
+/* Mobile lobby - ensure content is visible on short screens */
+@media (max-width: 768px) {
+  .lobby-container {
+    position: absolute;
+    top: var(--topbar-height);
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 24px;
+    padding-bottom: 24px;
+    overflow-y: auto;
+  }
+
+  .lobby-content {
+    margin-top: 0;
+  }
+}
+
 /* ========================================
    Victory Overlay
    ======================================== */
@@ -961,7 +1018,34 @@ button.success {
   padding: var(--space-xl);
   min-width: 360px;
   max-width: 90vw;
+  max-height: 90vh;
+  overflow-y: auto;
   box-shadow: var(--shadow-panel);
+}
+
+/* Mobile modal adjustments */
+@media (max-width: 768px) {
+  .login-modal {
+    min-width: unset;
+    width: 90%;
+    max-width: 90vw;
+    max-height: 85vh;
+    padding: var(--space-lg);
+    margin: var(--space-md);
+  }
+
+  .login-modal-header h2 {
+    font-size: 20px;
+  }
+
+  .login-form label {
+    font-size: 13px;
+  }
+
+  .login-form .lobby-input {
+    padding: 10px var(--space-md);
+    font-size: 16px; /* Prevent zoom on iOS */
+  }
 }
 
 .modal-close {
@@ -1133,6 +1217,11 @@ button.success {
 
   .top-panel {
     gap: 8px;
+    top: calc(var(--topbar-height) + var(--space-sm));
+    left: var(--space-sm);
+    right: var(--space-sm);
+    transform: none;
+    width: auto;
   }
 
   .player-info {
@@ -1152,6 +1241,11 @@ button.success {
     gap: 8px;
     flex-wrap: wrap;
     justify-content: center;
+    bottom: var(--space-sm);
+    left: var(--space-sm);
+    right: var(--space-sm);
+    transform: none;
+    width: auto;
   }
 
   .turn-controls {
@@ -1775,36 +1869,79 @@ button.success {
 @media (max-width: 768px) {
   .dashboard-container {
     flex-direction: column;
-    padding: 12px;
-    gap: 12px;
+    padding: 8px;
+    gap: 8px;
+    min-height: auto;
+    height: auto;
+    overflow-y: auto;
+    position: absolute;
+    top: var(--topbar-height);
+    left: 0;
+    right: 0;
+    bottom: 0;
   }
 
   .profile-sidebar {
     width: 100%;
-    padding: 16px;
+    padding: 12px;
     position: static;
     order: -1;
+    height: auto;
+    gap: 12px;
+  }
+
+  .user-profile {
+    margin-bottom: 0;
+  }
+
+  .user-avatar {
+    width: 48px;
+    height: 48px;
+    font-size: 20px;
+    margin-bottom: 8px;
+  }
+
+  .user-name {
+    font-size: 16px;
+    margin-bottom: 0;
+  }
+
+  .online-status {
+    display: none;
   }
 
   .user-stats {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+  }
+
+  .stat-item {
+    padding: 8px 4px;
   }
 
   .stat-value {
-    font-size: 20px;
+    font-size: 16px;
+  }
+
+  .stat-label {
+    font-size: 9px;
   }
 
   .game-list-container {
     width: 100%;
-    padding: 16px;
+    padding: 12px;
+    min-height: 150px;
+  }
+
+  .game-list-header h3 {
+    font-size: 16px;
   }
 
   .game-card {
     flex-direction: column;
     align-items: stretch;
-    gap: 12px;
-    padding: 16px;
+    gap: 8px;
+    padding: 12px;
   }
 
   .game-card-header {
@@ -1815,7 +1952,7 @@ button.success {
 
   .game-action-btn {
     width: 100%;
-    min-height: 48px;
+    min-height: 44px;
     margin-top: 4px;
   }
 
@@ -1827,6 +1964,35 @@ button.success {
   .game-card-actions .game-action-btn {
     width: 100%;
     min-height: 44px;
+  }
+
+  /* Ensure quick actions are visible */
+  .quick-actions {
+    gap: 6px;
+  }
+
+  .quick-actions .action-btn {
+    min-height: 44px;
+    padding: 10px 16px;
+    font-size: 14px;
+  }
+
+  .join-game-form {
+    gap: 6px;
+  }
+
+  .join-game-input {
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+
+  .dashboard-difficulty {
+    margin-top: 4px;
+  }
+
+  .difficulty-btn {
+    padding: 8px 12px;
+    font-size: 12px;
   }
 }
 
@@ -2091,6 +2257,37 @@ button.success {
 
   .join-game-row {
     flex-direction: column;
+  }
+}
+
+/* Mobile landing - ensure content is scrollable and visible on short screens */
+@media (max-width: 768px) {
+  .landing-container {
+    position: absolute;
+    top: var(--topbar-height);
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 32px;
+    padding: 24px 16px;
+    overflow-y: auto;
+  }
+
+  .landing-hero {
+    flex-shrink: 0;
+  }
+
+  .landing-info {
+    flex-shrink: 0;
+  }
+
+  .landing-join {
+    flex-shrink: 0;
+    padding-bottom: 24px;
   }
 }
 
