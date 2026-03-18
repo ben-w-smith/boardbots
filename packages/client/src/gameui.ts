@@ -52,7 +52,6 @@ export class GameUI {
   private selectedRobotPosition: Pair | null = null;
   private aiEnabled: boolean = false;
   private aiPlayerIndex?: number;
-  private gameCode: string = '';
 
   constructor(options: GameUIOptions) {
     this.container = options.container;
@@ -84,7 +83,6 @@ export class GameUI {
   private createTopPanel(): HTMLElement {
     const panel = document.createElement('div');
     panel.className = 'ui-panel top-panel';
-    panel.setAttribute('data-testid', 'state-ingame');
     panel.innerHTML = `
       <div class="player-info" id="player1-info">
         <div class="player-indicator player-1"></div>
@@ -135,10 +133,7 @@ export class GameUI {
     waitingControls.id = 'waiting-controls';
     waitingControls.className = 'waiting-controls';
     waitingControls.innerHTML = `
-      <div class="game-code-display" data-testid="game-code-display">
-        <span class="game-code">------</span>
-      </div>
-      <button id="btn-start" class="primary" data-testid="btn-start-game-ui">Start Game</button>
+      <button id="btn-start" class="primary">Start Game</button>
     `;
 
     // AI button
@@ -329,12 +324,6 @@ export class GameUI {
     this.render();
   }
 
-  /** Set game code for display in waiting phase */
-  setGameCode(code: string): void {
-    this.gameCode = code;
-    this.render();
-  }
-
   /** Set selected robot position for button handlers */
   setSelectedRobotPosition(pos: Pair | null): void {
     this.selectedRobotPosition = pos;
@@ -434,7 +423,6 @@ export class GameUI {
     const overlay = document.createElement('div');
     overlay.id = 'victory-overlay';
     overlay.className = 'victory-overlay';
-    overlay.setAttribute('data-testid', 'game-over-container');
     overlay.innerHTML = `
       <div class="victory-hex-pattern"></div>
       <div class="victory-content">
@@ -447,7 +435,7 @@ export class GameUI {
         <div class="victory-buttons">
           <button id="victory-rematch" class="primary">Rematch</button>
           <button id="victory-dashboard">Dashboard</button>
-          <button id="victory-new-game" data-testid="btn-return-home">New Game</button>
+          <button id="victory-new-game">New Game</button>
         </div>
       </div>
     `;
@@ -526,19 +514,6 @@ export class GameUI {
 
   /** Render current state */
   private render(): void {
-    // Always update testid based on phase (even if gameState is null)
-    if (this.phase === 'waiting') {
-      this.topPanel.setAttribute('data-testid', 'state-waiting');
-    } else {
-      this.topPanel.setAttribute('data-testid', 'state-ingame');
-    }
-
-    // Update game code display in waiting controls
-    const gameCodeEl = this.bottomPanel.querySelector('.game-code');
-    if (gameCodeEl) {
-      gameCodeEl.textContent = this.gameCode || '------';
-    }
-
     if (!this.gameState) return;
 
     this.renderPlayerInfo();

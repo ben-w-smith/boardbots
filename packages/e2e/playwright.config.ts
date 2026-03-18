@@ -1,4 +1,4 @@
-import { defineConfig, devices } from "@playwright/test";
+import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./tests",
@@ -11,16 +11,11 @@ export default defineConfig({
 
   use: {
     baseURL: "http://localhost:5173",
-    trace: "retain-on-failure",
-    screenshot: "only-on-failure",
-    video: "retain-on-failure",
+    trace: "on-first-retry",
     viewport: { width: 1280, height: 960 },
   },
 
-  projects: [
-    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
-    { name: "Mobile Chrome", use: { ...devices["Pixel 5"] } },
-  ],
+  projects: [{ name: "chromium", use: { browserName: "chromium" } }],
 
   webServer: [
     {

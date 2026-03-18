@@ -21,10 +21,6 @@ export interface LobbyOptions {
   onLogin?: () => void;
   /** Called when player wants to register a new account */
   onRegister?: () => void;
-  /** Called when player wants to start the game (from waiting screen) */
-  onStartGame?: () => void;
-  /** Called when player leaves the lobby (return to appropriate home screen) */
-  onLeaveLobby?: () => void;
 }
 
 const PLAYER_NAME_KEY = 'lockitdown_player_name';
@@ -77,8 +73,6 @@ export class LobbyUI {
   private onConnectToGame?: (gameCode: string, playerName: string) => void;
   private onLogin?: () => void;
   private onRegister?: () => void;
-  private onStartGame?: () => void;
-  private onLeaveLobby?: () => void;
 
   private currentMode: LobbyMode = 'landing';
   private lobbyEl: HTMLElement;
@@ -94,15 +88,12 @@ export class LobbyUI {
     this.onConnectToGame = options.onConnectToGame;
     this.onLogin = options.onLogin;
     this.onRegister = options.onRegister;
-    this.onStartGame = options.onStartGame;
-    this.onLeaveLobby = options.onLeaveLobby;
 
     this.playerName = getSavedPlayerName();
 
     // Create lobby container
     this.lobbyEl = document.createElement('div');
     this.lobbyEl.className = 'lobby-container';
-    this.lobbyEl.setAttribute('data-testid', 'state-idle');
     this.container.appendChild(this.lobbyEl);
 
     this.render();
@@ -171,9 +162,6 @@ export class LobbyUI {
   }
 
   private renderLanding(): void {
-    // Update testid for Idle state (knowledge graph expects state-idle on landing page)
-    this.lobbyEl.setAttribute('data-testid', 'state-idle');
-
     const hasAIGame = !!this.onCreateAIGame;
     const authState = authManager.getState();
     const isAuthenticated = authState.isAuthenticated;
@@ -209,11 +197,9 @@ export class LobbyUI {
             ${difficultyOptions}
 
             <div class="lobby-buttons">
-              <button id="btn-create" data-testid="btn-create-game" class="primary">Create Game</button>
+              <button id="btn-create" class="primary">Create Game</button>
               ${hasAIGame ? '<button id="btn-vs-ai" class="secondary">Play vs AI</button>' : ''}
-              <button id="btn-join" data-testid="btn-join-game">Join Game</button>
-              <button id="btn-login" data-testid="btn-login" class="secondary">Log In</button>
-              <button id="btn-register" data-testid="btn-register" class="secondary">Create Account</button>
+              <button id="btn-join">Join Game</button>
             </div>
 
             <div class="lobby-error"></div>
@@ -229,10 +215,8 @@ export class LobbyUI {
             <h1 class="landing-title">Lock It Down</h1>
             <p class="landing-tagline">A hex-based tactical board game where robots battle for control</p>
             <div class="landing-hero-actions">
-              <button id="btn-create" data-testid="btn-create-game" class="primary large">Create Game</button>
-              <button id="btn-join-landing" data-testid="btn-join-game" class="secondary large">Join Game</button>
-              <button id="btn-login" data-testid="btn-login" class="secondary large">Log In</button>
-              <button id="btn-register" data-testid="btn-register" class="secondary large">Create Account</button>
+              <button id="btn-login" class="primary large">Log In to Play</button>
+              <button id="btn-register" class="secondary large">Create Account</button>
             </div>
           </section>
 
@@ -253,6 +237,16 @@ export class LobbyUI {
               <h3>Win the Match</h3>
               <p>Lock down more robots than your opponent to win</p>
             </div>
+          </section>
+
+          <!-- Join Game (Guest) -->
+          <section class="landing-join">
+            <p>Have a game code? Join as a guest:</p>
+            <div class="join-game-row">
+              <input type="text" id="game-code" class="lobby-input" placeholder="Enter game code" maxlength="6" />
+              <button id="btn-join" class="primary">Join</button>
+            </div>
+            <div class="lobby-error"></div>
           </section>
         </div>
       `;
@@ -296,10 +290,6 @@ export class LobbyUI {
     });
 
     btnCreate?.addEventListener('click', () => {
-      // Generate guest name if not set (for guest users)
-      if (!authState.isAuthenticated && !this.playerName) {
-        this.playerName = `Guest_${Math.random().toString(36).substring(2, 6)}`;
-      }
       if (this.validateName()) {
         savePlayerName(this.playerName);
         this.handleCreateClick();
@@ -314,27 +304,24 @@ export class LobbyUI {
     });
 
     btnJoin?.addEventListener('click', () => {
-      // Generate guest name if not set
+      // For guests, generate a random name if not set
       if (!authState.isAuthenticated && !this.playerName) {
         this.playerName = `Guest_${Math.random().toString(36).substring(2, 6)}`;
       }
-      // Go to join screen for all users
-      if (this.validateName()) {
-        savePlayerName(this.playerName);
-        this.currentMode = 'join';
-        this.render();
+      // For guests, directly handle join with game code
+      if (!authState.isAuthenticated) {
+        const joinInput = this.lobbyEl.querySelector('#game-code') as HTMLInputElement;
+        if (joinInput) {
+          this.handleJoinClick(joinInput.value);
+        }
+      } else {
+        // For logged-in users, go to join screen
+        if (this.validateName()) {
+          savePlayerName(this.playerName);
+          this.currentMode = 'join';
+          this.render();
+        }
       }
-    });
-
-    // Join Game button on guest landing page - navigate to join screen
-    const btnJoinLanding = this.lobbyEl.querySelector('#btn-join-landing');
-    btnJoinLanding?.addEventListener('click', () => {
-      // Generate guest name if not set
-      if (!authState.isAuthenticated && !this.playerName) {
-        this.playerName = `Guest_${Math.random().toString(36).substring(2, 6)}`;
-      }
-      this.currentMode = 'join';
-      this.render();
     });
 
     // Login button - triggers login modal
@@ -358,6 +345,17 @@ export class LobbyUI {
           savePlayerName(this.playerName);
           this.handleCreateClick();
         }
+      }
+    });
+
+    // Enter key in guest game code input
+    const guestJoinInput = this.lobbyEl.querySelector('#game-code') as HTMLInputElement;
+    guestJoinInput?.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        if (!authState.isAuthenticated && !this.playerName) {
+          this.playerName = `Guest_${Math.random().toString(36).substring(2, 6)}`;
+        }
+        this.handleJoinClick(guestJoinInput.value);
       }
     });
   }
@@ -420,8 +418,6 @@ export class LobbyUI {
   }
 
   private renderCreate(): void {
-    this.lobbyEl.setAttribute('data-testid', 'state-creating');
-
     this.lobbyEl.innerHTML = `
       <div class="lobby-content">
         <div class="lobby-header">
@@ -435,8 +431,6 @@ export class LobbyUI {
   }
 
   private renderJoin(): void {
-    this.lobbyEl.setAttribute('data-testid', 'state-joining');
-
     this.lobbyEl.innerHTML = `
       <div class="lobby-content">
         <div class="lobby-header">
@@ -450,7 +444,6 @@ export class LobbyUI {
             <input
               type="text"
               id="game-code"
-              data-testid="game-code-input"
               class="lobby-input game-code-input"
               placeholder="AB3K9X"
               maxlength="100"
@@ -461,7 +454,7 @@ export class LobbyUI {
 
           <div class="lobby-buttons">
             <button id="btn-back" class="secondary">Back</button>
-            <button id="btn-join-now" data-testid="btn-join-now" class="primary">Join</button>
+            <button id="btn-join-now" class="primary">Join</button>
           </div>
 
           <div class="lobby-error"></div>
@@ -529,8 +522,6 @@ export class LobbyUI {
   private renderWaiting(): void {
     const gameUrl = this.gameCode ? `${window.location.origin}?game=${this.gameCode}` : '';
 
-    this.lobbyEl.setAttribute('data-testid', 'state-waiting');
-
     this.lobbyEl.innerHTML = `
       <div class="lobby-content">
         <div class="lobby-header">
@@ -539,15 +530,13 @@ export class LobbyUI {
         </div>
 
         <div class="lobby-form">
-          <div class="game-code-display" data-testid="game-code-display">
+          <div class="game-code-display">
             <span class="game-code">${this.escapeHtml(this.gameCode || '------')}</span>
           </div>
 
           <div class="lobby-buttons">
             <button id="btn-copy" class="secondary">Copy Link</button>
             <button id="btn-copy-code" class="secondary">Copy Code</button>
-            <button id="btn-start-game" class="primary" data-testid="btn-start-game">Start Game</button>
-            <button id="btn-leave-lobby" class="secondary danger" data-testid="btn-leave-lobby">Leave</button>
           </div>
 
           <div class="waiting-status">
@@ -566,8 +555,6 @@ export class LobbyUI {
   private setupWaitingHandlers(gameUrl: string): void {
     const btnCopy = this.lobbyEl.querySelector('#btn-copy');
     const btnCopyCode = this.lobbyEl.querySelector('#btn-copy-code');
-    const btnStartGame = this.lobbyEl.querySelector('#btn-start-game');
-    const btnLeaveLobby = this.lobbyEl.querySelector('#btn-leave-lobby');
 
     btnCopy?.addEventListener('click', async () => {
       try {
@@ -584,24 +571,6 @@ export class LobbyUI {
         this.showCopySuccess(btnCopyCode as HTMLButtonElement);
       } catch {
         this.showError('Failed to copy code');
-      }
-    });
-
-    btnStartGame?.addEventListener('click', () => {
-      // Start the game (for E2E tests and single-player scenarios)
-      if (this.onStartGame) {
-        this.onStartGame();
-      }
-    });
-
-    btnLeaveLobby?.addEventListener('click', () => {
-      // Return to appropriate home screen
-      this.gameCode = null;
-      this.currentMode = 'landing';
-      this.render();
-      // Notify parent to handle navigation (e.g., return to Dashboard for authenticated users)
-      if (this.onLeaveLobby) {
-        this.onLeaveLobby();
       }
     });
   }
