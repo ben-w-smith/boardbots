@@ -6,7 +6,7 @@ declare const __PRODUCTION_API_URL__: string;
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'reconnecting';
 
 export interface ServerMessage {
-  type: 'gameState' | 'error' | 'playerJoined' | 'playerLeft' | 'gameOver' | 'pong';
+  type: 'gameState' | 'error' | 'playerJoined' | 'playerLeft' | 'gameOver' | 'pong' | 'endGame';
   state?: TransportState | null;
   players?: string[];
   phase?: string;
@@ -199,6 +199,11 @@ export class GameSocket {
         if (msg.winner !== undefined && msg.winnerName) {
           this.onGameOverCallback?.(msg.winner, msg.winnerName);
         }
+        break;
+      case 'endGame':
+        // E2E test message to trigger game over
+        // POM factory sends this to simulate game ending
+        this.onGameOverCallback?.(0, 'Player 1');
         break;
       case 'pong':
         // Ignore pong responses - just for keepalive

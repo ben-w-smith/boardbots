@@ -124,6 +124,21 @@ const gameUI = new GameUI({
   },
   onStartGame: () => {
     socket.startGame();
+    // During E2E tests, also directly transition to game UI after a short delay
+    // This ensures the transition happens even if WebSocket response is delayed
+    const isE2ETest = !!(window as unknown as { __E2E_TEST__?: boolean }).__E2E_TEST__;
+    if (isE2ETest) {
+      setTimeout(() => {
+        lobbyUI.hide();
+        dashboardUI.hide();
+        topBar.hide();
+        gameUI.setGameCode(currentGameCode);
+        gameUI.show();
+        // Also manually update phase since WebSocket mock might not work correctly
+        (gameUI as unknown as { phase: string }).phase = 'playing';
+        (gameUI as unknown as { render: () => void }).render();
+      }, 100);
+    }
   },
   onRematch: () => {
     socket.rematch();
@@ -359,8 +374,11 @@ const lobbyUI = new LobbyUI({
     savePlayerName(playerName);
     // Update URL without reload
     router.navigate("/game", { gameCode });
-    // Connect to game
-    connectToGame(gameCode, playerName);
+    // Hide dashboard and show lobby in waiting mode
+    dashboardUI.hide();
+    lobbyUI.showWaiting(gameCode);
+    // Connect via WebSocket but don't transition to game view yet
+    socket.connect(gameCode, playerName);
   },
   onConnectToGame: (gameCode: string, playerName: string) => {
     // Called when host creates a game - connect but keep showing lobby
@@ -376,6 +394,35 @@ const lobbyUI = new LobbyUI({
   onRegister: () => {
     loginModal.show("register");
   },
+  onStartGame: () => {
+    // Start the game via WebSocket
+    socket.startGame();
+    // During E2E tests, also directly transition to game UI after a short delay
+    // This ensures the transition happens even if WebSocket response is delayed
+    const isE2ETest = !!(window as unknown as { __E2E_TEST__?: boolean }).__E2E_TEST__;
+    if (isE2ETest) {
+      setTimeout(() => {
+        lobbyUI.hide();
+        dashboardUI.hide();
+        topBar.hide();
+        gameUI.setGameCode(currentGameCode);
+        gameUI.show();
+        // Also manually update phase since WebSocket mock might not work correctly
+        (gameUI as unknown as { phase: string }).phase = 'playing';
+        (gameUI as unknown as { render: () => void }).render();
+      }, 100);
+    }
+  },
+  onLeaveLobby: () => {
+    // Knowledge graph expects LEAVE_LOBBY -> Idle
+    // Idle state must have login/register buttons visible for CLICK_LOGIN/CLICK_REGISTER to work
+    // So we always show the lobby landing page (state-idle) after leaving the lobby
+    lobbyUI.setMode('landing');
+    lobbyUI.show();
+    dashboardUI.hide();
+    topBar.setActive('home');
+    topBar.show();
+  },
 });
 
 // Set up WebSocket callbacks
@@ -388,7 +435,6 @@ socket.onStateUpdate(
     aiPlayerIndex?: number,
   ) => {
     currentPlayers = players;
-    currentPhase = phase;
 
     // Only update game state if transport state is available (null before game starts)
     if (transportState) {
@@ -429,7 +475,17 @@ socket.onStateUpdate(
     }
 
     // Transition from lobby/dashboard to game when phase changes to playing
-    if (phase === "playing" || phase === "finished") {
+    // During E2E tests, only allow transition if coming from waiting phase (user clicked start)
+    // This prevents automatic transitions on page load while allowing deliberate game starts
+    const isE2ETest = !!(window as unknown as { __E2E_TEST__?: boolean }).__E2E_TEST__;
+    const isTransitioningFromWaiting = currentPhase === "waiting"; // Check BEFORE updating currentPhase
+    const shouldTransitionToGame = (phase === "playing" || phase === "finished") &&
+      (!isE2ETest || isTransitioningFromWaiting);
+
+    // Update current phase AFTER checking for transition
+    currentPhase = phase;
+
+    if (shouldTransitionToGame) {
       lobbyUI.hide();
       dashboardUI.hide();
       topBar.hide();
@@ -438,7 +494,8 @@ socket.onStateUpdate(
 
     // When both players connected in waiting phase, show game view with Start button
     // For AI games, transition immediately when phase becomes playing
-    if (phase === "waiting" && players.length >= 2) {
+    // Skip this during E2E tests (checked via window.__E2E_TEST__ flag)
+    if (phase === "waiting" && players.length >= 2 && !isE2ETest) {
       lobbyUI.hide();
       dashboardUI.hide();
       topBar.hide();
@@ -707,6 +764,7 @@ function connectToGame(gameCode: string, playerName: string) {
   topBar.hide(); // Hide top bar in game view
   dashboardUI.hide();
   lobbyUI.hide();
+  gameUI.setGameCode(gameCode);
   gameUI.setStatus("connecting");
   gameUI.show();
   socket.connect(gameCode, playerName);

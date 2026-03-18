@@ -1,0 +1,21 @@
+---
+description: Graph Rules - For creating and modifying the Knowledge Graph
+globs: ["architecture/knowledge-graph.ts"]
+---
+
+# Knowledge Graph Guidelines
+
+When modifying `architecture/knowledge-graph.ts`, you are updating the core architectural blueprint of the application.
+
+## Rules
+
+1.  **XState V5 Syntax:**
+    The graph must be written in valid XState v5 syntax.
+2.  **Deterministic Transitions:**
+    Every node must have a deterministic path back to a stable state (e.g., `Idle`, `Error`, `LoggedOut`). Do not create orphaned states.
+3.  **Semantic Action Naming:**
+    Events (edges) must be named in `ALL_CAPS` and semantically describe a user action (e.g., `CLICK_LOGIN_SUBMIT`, `ENTER_LOBBY`).
+4.  **No Implementation Details:**
+    The graph describes *what* the user does, not *how* the app does it. Do not include React code, API calls, or database queries inside the machine definition.
+5.  **Test Generation Prerequisite:**
+    When adding a new path, note that Playwright E2E tests must be generated or updated to cover this new path before any frontend or backend code is written.

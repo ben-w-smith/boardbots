@@ -1,0 +1,20 @@
+---
+description: E2E Testing Guidelines - For Playwright test generation
+globs: ["packages/e2e/**/*"]
+---
+
+# Playwright Test Generation Rules
+
+When writing or modifying files in `packages/e2e`, your primary goal is to assert the user journeys defined in the Knowledge Graph (`architecture/knowledge-graph.ts`).
+
+## Rules
+
+1.  **Strict Page Object Models (POM):**
+    You must always use Page Object Models (`packages/e2e/helpers/pom`). Never write raw locators (`page.locator(...)`) directly inside test files.
+    If a locator changes, update it once in the POM so all generated tests inherit the fix.
+2.  **Visual Over Implementation:**
+    Test from the user's perspective. Assert on what the user sees (`await expect(page.getByText('Welcome')).toBeVisible()`), not on the underlying React component state.
+3.  **Graph Alignment:**
+    Every test must correlate directly to a path or transition defined in the Knowledge Graph.
+4.  **Mocking & Seeding:**
+    Ensure tests are reliable by mocking API responses when necessary (e.g., using Playwright's route mocking) or by leveraging database seeding functions in the test setup. Tests must not be flaky.

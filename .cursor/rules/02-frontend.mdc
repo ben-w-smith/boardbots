@@ -1,0 +1,21 @@
+---
+description: Frontend Guidelines - For generating React/Browser code
+globs: ["packages/web-client/**/*"]
+---
+
+# UI Generation Rules
+
+When generating code in `packages/web-client`, you are fulfilling the visual contract required by the Playwright tests.
+
+## Rules
+
+1.  **Strictly Component-Based:**
+    The UI must be built from modular components.
+2.  **No Core Logic:**
+    Do not place heavy business logic (e.g., state machines, complex data derivations) in the UI. The UI is a "dumb renderer" of state.
+3.  **Test Stability (data-testid):**
+    You must rely on and preserve `data-testid` attributes. If a generated Playwright test expects a specific `data-testid`, you must fulfill that requirement without changing the test.
+4.  **Styling constraints:**
+    Follow the project's CSS system (e.g., Tailwind CSS). Do not use inline styles.
+5.  **Aesthetics:**
+    Use `framer-motion` for interaction feedback and page transitions. The UI should be highly responsive and modern.
