@@ -1,5 +1,5 @@
 import { test, expect } from "../../fixtures/game";
-import { clickHex, waitForGameStateSettled, getGameState } from "../../helpers/game.js";
+import { clickHex, waitForGameStateSettled, getGameState, waitForRobotCount } from "../../helpers/game.js";
 import { POSITIONS } from "../../helpers/constants.js";
 
 /**
@@ -14,8 +14,9 @@ import { POSITIONS } from "../../helpers/constants.js";
  * 4. Assertions read directly from window.gameState
  */
 test("scenario: player places first robot on corridor hex", async ({
-  gameWithPlayers: { hostPage },
+  gameWithPlayers,
 }) => {
+  const { hostPage } = gameWithPlayers;
   // Preconditions (set by gameWithPlayers fixture):
   // - Two-player game
   // - Playing phase
@@ -28,6 +29,9 @@ test("scenario: player places first robot on corridor hex", async ({
 
   // Step 2: Player 0 clicks direction hex (0, 4) — facing north toward arena center
   await clickHex(hostPage, POSITIONS.ARENA_ENTRY_SOUTH.q, POSITIONS.ARENA_ENTRY_SOUTH.r);
+
+  // Wait for the robot to be placed (state synced from server)
+  await waitForRobotCount(hostPage, 1);
 
   // Wait for state to settle (animations complete, state synced)
   await waitForGameStateSettled(hostPage);

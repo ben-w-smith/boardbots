@@ -14,6 +14,7 @@ export const loginLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: true, // Don't count successful requests against the limit
+  skip: () => process.env.NODE_ENV === "test", // Skip in test environment
 });
 
 /**
@@ -29,4 +30,5 @@ export const registerLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === "test", // Skip in test environment
 });

@@ -1,12 +1,16 @@
 import type { Page } from "@playwright/test";
+import { randomUUID } from "crypto";
+
+let usernameCounter = 0;
 
 /**
  * Generate a unique username for testing
+ * Uses UUID component + counter for guaranteed uniqueness
  */
 export function generateTestUsername(): string {
-  const timestamp = Date.now().toString(36);
-  const random = Math.random().toString(36).substring(2, 6);
-  return `test_${timestamp}_${random}`;
+  const uuid = randomUUID().split("-")[0]; // First 8 chars of UUID
+  const counter = (usernameCounter++).toString(36);
+  return `t${uuid}_${counter}`;
 }
 
 /**

@@ -51,11 +51,13 @@ export async function setupGame(browser: Browser) {
 /**
  * Wait for gameStateSettled event - fires when animations complete
  * and the game state is stable for assertions.
+ * Also waits a brief moment to ensure state sync has propagated.
  */
 export async function waitForGameStateSettled(
   page: Page,
   timeout = 10_000,
 ): Promise<void> {
+  // First wait for any pending state updates to arrive
   await page.waitForFunction(
     () => {
       // Check if there's a pending settled dispatch or if animations are running
@@ -65,6 +67,8 @@ export async function waitForGameStateSettled(
     null,
     { timeout },
   );
+  // Small additional wait to ensure state sync has completed
+  await page.waitForTimeout(100);
 }
 
 /**
@@ -90,6 +94,21 @@ export async function waitForTurn(
  */
 export async function getGameState(page: Page): Promise<unknown> {
   return page.evaluate(() => (window as any).gameState);
+}
+
+/**
+ * Wait for a specific number of robots to be on the board.
+ */
+export async function waitForRobotCount(
+  page: Page,
+  count: number,
+  timeout = 10_000,
+): Promise<void> {
+  await page.waitForFunction(
+    (c) => (window as any).gameState?.robots?.length === c,
+    count,
+    { timeout },
+  );
 }
 
 /**

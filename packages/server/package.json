@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx --watch src/index.ts",
+    "dev:test": "NODE_ENV=test tsx --watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "vitest run",
