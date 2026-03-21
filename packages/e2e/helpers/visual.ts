@@ -83,7 +83,7 @@ export type VisualState =
  * CSS selectors for each visual state.
  */
 export const VISUAL_STATE_SELECTORS: Record<VisualState, string> = {
-  landing: ".landing-page",
+  landing: ".lobby-container",
   "login-modal": ".login-modal",
   "register-modal": ".login-modal", // Same modal, different mode
   dashboard: ".dashboard-container",

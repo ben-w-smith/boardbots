@@ -1,5 +1,5 @@
 /**
- * Simple client-side router for URL-based navigation
+ * Client-side router with guards and middleware support
  */
 
 export type Route = '/' | '/login' | '/register' | '/dashboard' | '/game';
@@ -8,9 +8,24 @@ export interface RouteParams {
   gameCode?: string;
 }
 
+/** Route guard - returns true to allow navigation, false to block */
+export type RouteGuard = (params: RouteParams) => boolean | Promise<boolean>;
+
+/** Route component renderer */
+export type RouteComponent = (params: RouteParams) => void | Promise<void>;
+
+/** Route configuration */
+export interface RouteConfig {
+  path: Route;
+  component: RouteComponent;
+  guards?: RouteGuard[];
+}
+
 class Router {
   private static instance: Router;
   private listeners: Set<() => void> = new Set();
+  private routes: Map<Route, RouteConfig> = new Map();
+  private currentParams: RouteParams = {};
 
   private constructor() {}
 
@@ -54,6 +69,40 @@ class Router {
     return params;
   }
 
+  /** Register a route with optional guards */
+  register(config: RouteConfig): void {
+    this.routes.set(config.path, config);
+  }
+
+  /** Handle the current route - run guards and render component */
+  async handleRoute(): Promise<boolean> {
+    const route = this.getRoute();
+    const params = this.getParams();
+    this.currentParams = params;
+
+    const config = this.routes.get(route);
+    if (!config) {
+      console.warn(`No route handler registered for: ${route}`);
+      return false;
+    }
+
+    // Run guards in order
+    if (config.guards) {
+      for (const guard of config.guards) {
+        const allowed = await guard(params);
+        if (!allowed) {
+          // Guard blocked navigation - it should have redirected
+          return false;
+        }
+      }
+    }
+
+    // Run component
+    await config.component(params);
+    this.notifyListeners();
+    return true;
+  }
+
   /** Navigate to a route */
   navigate(route: Route, params?: RouteParams): void {
     const url = this.buildUrl(route, params);
@@ -90,6 +139,11 @@ class Router {
   /** Handle browser back/forward buttons */
   handlePopState(): void {
     this.notifyListeners();
+  }
+
+  /** Get current cached params */
+  getCurrentParams(): RouteParams {
+    return { ...this.currentParams };
   }
 }
 
