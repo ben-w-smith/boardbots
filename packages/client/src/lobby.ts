@@ -197,9 +197,9 @@ export class LobbyUI {
             ${difficultyOptions}
 
             <div class="lobby-buttons">
-              <button id="btn-create" class="primary">Create Game</button>
-              ${hasAIGame ? '<button id="btn-vs-ai" class="secondary">Play vs AI</button>' : ''}
-              <button id="btn-join">Join Game</button>
+              <button id="btn-create" class="primary" data-testid="create-game">Create Game</button>
+              ${hasAIGame ? '<button id="btn-vs-ai" class="secondary" data-testid="vs-ai">Play vs AI</button>' : ''}
+              <button id="btn-join" data-testid="join-game">Join Game</button>
             </div>
 
             <div class="lobby-error"></div>
@@ -243,8 +243,8 @@ export class LobbyUI {
           <section class="landing-join">
             <p>Have a game code? Join as a guest:</p>
             <div class="join-game-row">
-              <input type="text" id="game-code" class="lobby-input" placeholder="Enter game code" maxlength="6" />
-              <button id="btn-join" class="primary">Join</button>
+              <input type="text" id="game-code" class="lobby-input" placeholder="Enter game code" maxlength="6" data-testid="game-code" />
+              <button id="btn-join" class="primary" data-testid="join-game">Join</button>
             </div>
             <div class="lobby-error"></div>
           </section>
@@ -531,7 +531,7 @@ export class LobbyUI {
 
         <div class="lobby-form">
           <div class="game-code-display">
-            <span class="game-code">${this.escapeHtml(this.gameCode || '------')}</span>
+            <span class="game-code" data-testid="game-code">${this.escapeHtml(this.gameCode || '------')}</span>
           </div>
 
           <div class="lobby-buttons">

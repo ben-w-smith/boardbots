@@ -84,17 +84,17 @@ export class GameUI {
     const panel = document.createElement('div');
     panel.className = 'ui-panel top-panel';
     panel.innerHTML = `
-      <div class="player-info" id="player1-info">
+      <div class="player-info" id="player1-info" data-testid="player-info-0">
         <div class="player-indicator player-1"></div>
         <span class="player-name">Player 1</span>
         <span class="player-score"></span>
         <span class="player-robots"></span>
       </div>
-      <div class="turn-info">
+      <div class="turn-info" data-testid="turn-indicator">
         <span class="current-turn">Turn: Player 1</span>
-        <span class="moves-left">Moves: 3</span>
+        <span class="moves-left" data-testid="moves-remaining">Moves: 3</span>
       </div>
-      <div class="player-info" id="player2-info">
+      <div class="player-info" id="player2-info" data-testid="player-info-1">
         <div class="player-indicator player-2"></div>
         <span class="player-name">Player 2</span>
         <span class="player-score"></span>
@@ -114,13 +114,13 @@ export class GameUI {
     turnControls.id = 'turn-controls';
     turnControls.className = 'turn-controls';
     turnControls.innerHTML = `
-      <button id="btn-turn-left" class="action-btn" title="Turn Left">
+      <button id="btn-turn-left" class="action-btn" title="Turn Left" data-testid="btn-turn-left">
         <span>↶ Turn L</span>
       </button>
-      <button id="btn-advance" class="action-btn" title="Advance">
+      <button id="btn-advance" class="action-btn" title="Advance" data-testid="btn-advance">
         <span>↑ Advance</span>
       </button>
-      <button id="btn-turn-right" class="action-btn" title="Turn Right">
+      <button id="btn-turn-right" class="action-btn" title="Turn Right" data-testid="btn-turn-right">
         <span>↷ Turn R</span>
       </button>
       <button id="btn-cancel" class="action-btn danger" title="Cancel">
@@ -176,7 +176,7 @@ export class GameUI {
     panel.className = 'ui-panel status-panel';
     panel.id = 'status-panel';
     panel.innerHTML = `
-      <div class="status info" id="status-message">Connecting...</div>
+      <div class="status info" id="status-message" data-testid="status-message">Connecting...</div>
     `;
     Object.assign(panel.style, {
       top: '80px',
@@ -423,10 +423,11 @@ export class GameUI {
     const overlay = document.createElement('div');
     overlay.id = 'victory-overlay';
     overlay.className = 'victory-overlay';
+    overlay.setAttribute('data-testid', 'game-over-overlay');
     overlay.innerHTML = `
       <div class="victory-hex-pattern"></div>
       <div class="victory-content">
-        <h1 class="victory-title ${isWinner ? 'winner' : 'loser'}">
+        <h1 class="victory-title ${isWinner ? 'winner' : 'loser'}" data-testid="game-over-title">
           ${isWinner ? 'Victory!' : 'Defeat'}
         </h1>
         <p class="victory-subtitle">

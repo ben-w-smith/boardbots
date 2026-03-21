@@ -9,6 +9,7 @@ packages/
   engine/   # Pure game logic (hex grid, moves, beam resolution, AI)
   client/   # Vite SPA (canvas renderer, lobby UI, game UI, WebSocket client)
   server/   # Node.js + Express (game rooms, WebSocket server, SQLite)
+  e2e/      # Playwright end-to-end tests
 ```
 
 ## Tech Stack
@@ -20,6 +21,7 @@ packages/
 - **ws** - WebSocket server
 - **better-sqlite3** - persistent storage
 - **Vitest** - testing
+- **Playwright** - E2E testing
 
 ## Architecture
 
@@ -44,20 +46,34 @@ packages/
 - Server holds authoritative game state and broadcasts updates
 - SQLite persists active game rooms
 
-## Common Commands
+## Quick Start
 
 ```bash
 # Install dependencies
 npm install
 
+# Start server (required first)
+npm run dev --workspace=packages/server
+
+# In another terminal, start client
+npm run dev --workspace=packages/client
+# Opens on http://localhost:5173
+```
+
+## Common Commands
+
+```bash
 # Start client dev server
 npm run dev
 
 # Start server dev mode (with hot reload)
 npm run dev --workspace=packages/server
 
-# Run all tests
+# Run all unit tests
 npm run test --workspaces --if-present
+
+# Run E2E tests
+npm run test:e2e
 
 # Build all packages for production
 npm run build
@@ -78,6 +94,14 @@ npm run start --workspace=packages/server
 - Engine must be built before client/server can import it
 - Server uses in-memory RoomManager for active game rooms with SQLite persistence
 - Client connects via WebSocket to server for real-time gameplay
+
+## Package-Specific Documentation
+
+Each package has its own `AGENTS.md` with package-specific guidance:
+
+- **[packages/engine/AGENTS.md](packages/engine/AGENTS.md)** - Game logic, hex grid, AI
+- **[packages/client/AGENTS.md](packages/client/AGENTS.md)** - Canvas rendering, UI, WebSocket client
+- **[packages/server/AGENTS.md](packages/server/AGENTS.md)** - HTTP routes, WebSocket, database
 
 ## Deployment
 

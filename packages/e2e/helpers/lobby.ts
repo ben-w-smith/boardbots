@@ -1,19 +1,30 @@
 import type { Page } from "@playwright/test";
+import { generateTestUsername, registerUser } from "./auth.js";
 
 /**
  * Create a new game as host. Returns the 6-character game code.
  * After calling this, the page will be on the "Waiting for opponent" screen.
+ *
+ * This function handles the full flow: register -> dashboard -> create game
  */
 export async function createGame(
   page: Page,
   playerName = "TestHost",
 ): Promise<string> {
-  await page.goto("/");
-  await page.locator("#player-name").fill(playerName);
-  await page.locator("#btn-create").click();
+  // Register a new user (this lands us on the dashboard)
+  const username = `${playerName}_${generateTestUsername()}`;
+  await registerUser(page, username, "TestPass123");
 
-  // Wait for the game code to appear on the waiting screen
-  const codeEl = page.locator(".game-code");
+  // Wait for dashboard to be ready
+  await page.locator(".dashboard-container").waitFor({ state: "visible" });
+
+  // Click the "New Game" button on the dashboard
+  await page.locator("#dashboard-btn-create").click();
+
+  // Wait for the game code to appear on the lobby's waiting screen
+  // Note: There are two .game-code elements - one in the game UI (hidden placeholder)
+  // and one in the lobby container (visible with actual code). Select the lobby one.
+  const codeEl = page.locator(".lobby-container .game-code");
   await codeEl.waitFor({ state: "visible", timeout: 10_000 });
   const code = await codeEl.textContent();
   if (!code || code === "------") {
@@ -24,23 +35,31 @@ export async function createGame(
 
 /**
  * Join an existing game as guest.
- * Navigates to /?game=CODE which auto-connects with a generated name,
- * OR uses the join form if a specific name is needed.
+ * Uses the dashboard join form to enter the game code.
+ *
+ * Current UI flow: input is always visible, just fill it and click Join.
  */
 export async function joinGame(
   page: Page,
   gameCode: string,
   playerName = "TestGuest",
 ): Promise<void> {
-  // Navigate directly with game code — main.ts will auto-generate a name
-  // But we want a specific name, so use the lobby join flow
-  await page.goto("/");
-  await page.locator("#player-name").fill(playerName);
-  await page.locator("#btn-join").click();
+  // Register a new user (this lands us on the dashboard)
+  const username = `${playerName}_${generateTestUsername()}`;
+  await registerUser(page, username, "TestPass123");
 
-  // Now on the join screen
-  await page.locator("#game-code").fill(gameCode);
-  await page.locator("#btn-join-now").click();
+  // Wait for dashboard to be ready
+  await page.locator(".dashboard-container").waitFor({ state: "visible" });
+
+  // The join input is always visible in the current UI
+  // Fill in the game code
+  await page.locator("#dashboard-join-code").fill(gameCode);
+
+  // Click the Join button to submit
+  await page.locator("#dashboard-btn-join").click();
+
+  // Wait for the game UI to appear
+  await page.locator(".top-panel").waitFor({ state: "visible", timeout: 10_000 });
 }
 
 /**

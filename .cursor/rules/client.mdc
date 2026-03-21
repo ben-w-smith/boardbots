@@ -5,7 +5,98 @@ globs: ["packages/client/**/*.ts"]
 
 # Client Package Rules
 
-- **Vite Proxy**: Ensure `/api` proxy is configured in `vite.config.ts`
-- **Canvas Rendering**: Use `requestAnimationFrame` for render loop
-- **Null State**: Handle `state: null` in game messages gracefully
-- **WebSocket Reconnect**: Client has reconnect logic built into `GameSocket`
+## Tech Stack
+
+- **Vite 7.x** - Dev server and bundler
+- **Canvas API** - Game board rendering
+- **WebSocket** - Real-time game communication
+
+## Proxy Configuration (Critical)
+
+The Vite dev server proxies `/api/*` requests to the backend server:
+
+```typescript
+// vite.config.ts
+server: {
+  proxy: {
+    '/api': {
+      target: 'http://127.0.0.1:3000',  // NOT port 8787!
+      changeOrigin: true,
+      ws: true,
+    },
+  },
+}
+```
+
+**Without this proxy:**
+- API calls to `/api/*` will fail
+- The app will redirect back to the landing page
+- Authentication and game operations will not work
+
+## Key Files
+
+| File | Purpose |
+|------|---------|
+| `src/main.ts` | App entry — wires lobby, game UI, WebSocket, renderer together |
+| `src/websocket.ts` | `GameSocket` class — WebSocket client with reconnect |
+| `src/lobby.ts` | `LobbyUI` — create/join game screens |
+| `src/gameui.ts` | `GameUI` — in-game HUD, buttons, move history |
+| `src/renderer.ts` | Canvas hex grid renderer with robot sprites and beams |
+| `src/input.ts` | `InputHandler` — click-to-select, move dispatch |
+| `src/animator.ts` | Animation system (advance, turn, placement, destruction) |
+| `vite.config.ts` | Vite config with proxy to backend |
+
+## Development Commands
+
+```bash
+# Terminal 1: Start server (MUST be running first)
+npm run dev --workspace=packages/server
+
+# Terminal 2: Start client
+npm run dev --workspace=packages/client
+# Opens on http://localhost:5173
+```
+
+## Canvas Rendering Loop
+
+The renderer uses `requestAnimationFrame` for the main render loop:
+- Runs continuously during active animations
+- Renderer draws: hex grid, robots, beams, highlights
+- Animator handles these animation types:
+  - `advance` - robot sliding movement
+  - `turn` - robot rotation animation
+  - `placement` - scale-in effect when robot spawns
+  - `destruction` - particle effects when robot dies
+
+## Null State Handling
+
+`gameState` messages can have `state: null` before the game starts (during waiting phase). Always check before accessing game state properties:
+
+```typescript
+// In websocket callback
+if (transportState) {
+  const gameState = fromTransport(transportState);
+  // Use gameState...
+}
+// Even if state is null, still process player list updates
+```
+
+**Do not assume gameState is always non-null.**
+
+## Input Modes
+
+The client uses two input modes:
+- `'select'` - Click to select a robot
+- `'selectDirection'` - Click to choose move direction
+
+## Common Mistakes
+
+1. **Hardcoding port 8787** - Backend is on port 3000, not 8787 (Cloudflare).
+
+2. **Running `wrangler dev`** - Wrong command. Use `npm run dev --workspace=packages/server`.
+
+3. **Accessing null gameState** - Always check `if (gameState)` before accessing properties.
+
+4. **Forgetting WebSocket reconnect** - The `GameSocket` class handles reconnect automatically. Don't create new connections manually.
+
+5. **Blocking the render loop** - Use `requestAnimationFrame`, never synchronous operations in render callbacks.

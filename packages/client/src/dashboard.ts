@@ -154,7 +154,7 @@ export class DashboardUI {
         ${this.renderStatsSection()}
         ${this.renderQuickActions()}
       </aside>
-      <main class="game-list-container">
+      <main class="game-list-container" data-testid="game-history">
         ${this.renderGameList()}
       </main>
     `;
@@ -210,12 +210,12 @@ export class DashboardUI {
   /** Render quick actions section */
   private renderQuickActions(): string {
     const aiButton = this.onCreateAIGame
-      ? `<button class="action-btn secondary" id="dashboard-btn-vs-ai">Play vs AI</button>`
+      ? `<button class="action-btn secondary" id="dashboard-btn-vs-ai" data-testid="vs-ai">Play vs AI</button>`
       : '';
 
     return `
       <div class="quick-actions">
-        <button class="action-btn primary" id="dashboard-btn-create">New Game</button>
+        <button class="action-btn primary" id="dashboard-btn-create" data-testid="create-game">New Game</button>
         ${aiButton}
         <div class="join-game-form">
           <input
@@ -225,7 +225,7 @@ export class DashboardUI {
             maxlength="6"
             id="dashboard-join-code"
           />
-          <button class="action-btn tertiary" id="dashboard-btn-join">Join</button>
+          <button class="action-btn tertiary" id="dashboard-btn-join" data-testid="join-game">Join</button>
         </div>
         ${this.renderDifficultySelector()}
         <button class="action-btn danger" id="dashboard-btn-logout">Logout</button>

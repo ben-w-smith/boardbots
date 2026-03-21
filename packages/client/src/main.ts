@@ -687,9 +687,27 @@ function render() {
 
 // Animation loop for smooth animations
 let animationFrameId: number | null = null;
+let pendingSettledDispatch = false;
+
+function dispatchGameStateSettled(): void {
+  window.dispatchEvent(
+    new CustomEvent("gameStateSettled", {
+      detail: {
+        state,
+        players: currentPlayers,
+        phase: currentPhase,
+        playerIndex: myPlayerIndex,
+      },
+    }),
+  );
+  pendingSettledDispatch = false;
+}
 
 function startAnimationLoop(): void {
-  if (animationFrameId !== null) return;
+  // Always mark that we need to dispatch settled when current animations complete
+  pendingSettledDispatch = true;
+
+  if (animationFrameId !== null) return; // Already animating, will dispatch when done
 
   function loop() {
     render();
@@ -697,6 +715,10 @@ function startAnimationLoop(): void {
       animationFrameId = requestAnimationFrame(loop);
     } else {
       animationFrameId = null;
+      // Dispatch settled event after animations complete
+      if (pendingSettledDispatch) {
+        dispatchGameStateSettled();
+      }
     }
   }
   animationFrameId = requestAnimationFrame(loop);
@@ -910,12 +932,19 @@ const webmcpContext: WebMCPContext = {
 initWebMCP(webmcpContext);
 
 // Expose for debugging
+Object.defineProperty(window as unknown as Record<string, unknown>, "gameState", {
+  get() {
+    return state;
+  },
+  enumerable: true,
+  configurable: true,
+});
 Object.assign(window as unknown as Record<string, unknown>, {
-  gameState: state,
   renderer,
   socket,
   inputHandler,
   lobbyUI,
   dashboardUI,
   authManager,
+  animator,
 });

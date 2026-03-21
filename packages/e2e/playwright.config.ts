@@ -9,13 +9,29 @@ export default defineConfig({
   reporter: "html",
   timeout: 30_000,
 
+  expect: {
+    toHaveScreenshot: {
+    maxDiffPixels: 100,
+    threshold: 0.2,
+    animations: "disabled",
+  },
+  },
+
   use: {
     baseURL: "http://localhost:5173",
     trace: "on-first-retry",
     viewport: { width: 1280, height: 960 },
+    screenshot: "only-on-failure",
   },
 
-  projects: [{ name: "chromium", use: { browserName: "chromium" } }],
+  projects: [
+    { name: "chromium", use: { browserName: "chromium" } },
+    {
+      name: "visual-regression",
+      use: { browserName: "chromium" },
+      testMatch: /visual\.spec\.ts$/,
+    },
+  ],
 
   webServer: [
     {

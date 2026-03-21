@@ -1,11 +1,107 @@
 ---
-description: "Server package rules for Cloudflare Durable Objects"
+description: "Server package rules for Node.js + Express + ws + SQLite"
 globs: ["packages/server/**/*.ts"]
 ---
 
 # Server Package Rules
 
-- **Hibernation-Safe**: Always use `this.state.getWebSockets()`, never in-memory Maps for WebSocket tracking
-- **Attachment API**: Use `serializeAttachment`/`deserializeAttachment` for session metadata
-- **Wrangler Dev**: Test with `npx wrangler dev --port 8787` locally
-- **DO Patterns**: Durable Objects can hibernate - plan for state loss
+## Tech Stack
+
+The server uses:
+- **Express 4.x** - HTTP server
+- **ws** - WebSocket server
+- **better-sqlite3** - Persistent storage
+- **jsonwebtoken** - Authentication
+
+**NOT Cloudflare Durable Objects or Wrangler.** Never reference these.
+
+## Architecture Overview
+
+```
+index.ts
+    │
+    ├── HTTP Routes (Express)
+    │   ├── /api/health - Health check
+    │   ├── /api/auth/* - Auth routes (register, login, refresh, logout)
+    │   ├── /api/lobby/create - Create game (auth required)
+    │   └── /api/games/* - Game history (auth required)
+    │
+    └── WebSocket Server (ws)
+        └── /api/game/:code → RoomManager.handleConnection()
+                                    │
+                                    └── GameRoom (handles sockets, broadcasts)
+```
+
+## Key Files
+
+| File | Purpose |
+|------|---------|
+| `src/index.ts` | Express app, HTTP server, WebSocket upgrade handler |
+| `src/RoomManager.ts` | Singleton managing active GameRoom instances |
+| `src/game-room.ts` | Handles WebSocket connections for a single game |
+| `src/db.ts` | SQLite database service (users, games) |
+| `src/auth/index.ts` | Auth middleware exports (verifyToken, requireAuth, etc.) |
+| `src/auth/routes.ts` | Auth endpoints (register, login, refresh, logout) |
+
+## Development Commands
+
+```bash
+# Start server in dev mode (with hot reload via nodemon)
+npm run dev --workspace=packages/server
+
+# Server runs on port 3000 by default
+```
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | 3000 | HTTP server port |
+| `DATABASE_PATH` | `./data/boardbots.db` | SQLite database file |
+| `JWT_SECRET` | (required) | Secret for signing JWT tokens |
+
+## RoomManager Pattern
+
+`RoomManager` is a singleton that manages all active game rooms:
+
+```typescript
+// Get singleton instance
+const roomManager = RoomManager.getInstance();
+
+// Handle new WebSocket connection
+roomManager.handleConnection(gameCode, ws, user?);
+
+// Cleanup empty room
+roomManager.cleanupRoom(gameCode);
+```
+
+## WebSocket Flow
+
+1. Client connects to `ws://host/api/game/{gameCode}?token=jwt`
+2. Server upgrades HTTP to WebSocket
+3. `RoomManager.handleConnection()` routes to appropriate `GameRoom`
+4. `GameRoom` handles:
+   - Player join messages
+   - Game state broadcasts
+   - Move validation and broadcasting
+   - Disconnection handling
+
+## Common Mistakes
+
+1. **Using `this.state.getWebSockets()`** - This is Cloudflare DO API. Use `GameRoom.sockets` Map instead.
+
+2. **Running `wrangler dev`** - Wrong dev command. Use `npm run dev --workspace=packages/server`.
+
+3. **Storing sockets in Durable Object state** - We use in-memory Maps in `GameRoom` class.
+
+4. **Forgetting JWT token in WebSocket URL** - Authenticated users need `?token=jwt` in WebSocket URL.
+
+5. **Hardcoding port 8787** - Server runs on port 3000, not 8787.
+
+## Database Schema
+
+The SQLite database (`db.ts`) manages:
+- `users` table - User accounts with bcrypt password hashes
+- `games` table - Game history and metadata
+
+Use `dbService` singleton for all database operations.

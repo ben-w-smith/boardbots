@@ -8,16 +8,20 @@ This document covers critical friction points when working with the BoardBots Vi
 
 **This is the #1 issue that breaks local development.**
 
-The client requires `vite.config.ts` to have a proxy that forwards `/api/*` requests to the Wrangler dev server:
+The client requires `vite.config.ts` to have a proxy that forwards `/api/*` requests to the Node.js backend server:
 
 ```typescript
 // vite.config.ts
 export default defineConfig({
   server: {
     proxy: {
-      '/api': 'http://localhost:8787'
-    }
-  }
+      '/api': {
+        target: 'http://127.0.0.1:3000',  // Backend on port 3000
+        changeOrigin: true,
+        ws: true,
+      },
+    },
+  },
 })
 ```
 
@@ -57,7 +61,7 @@ if (transportState) {
 
 ### 4. Input Modes
 
-The client uses two input modes (the unused 'place' mode was removed):
+The client uses two input modes:
 - `'select'` - Click to select a robot
 - `'selectDirection'` - Click to choose move direction
 
@@ -81,17 +85,18 @@ The client uses two input modes (the unused 'place' mode was removed):
 
 ```bash
 # Terminal 1: Backend (must be running first)
-cd packages/server && npx wrangler dev --port 8787
+npm run dev --workspace=packages/server
+# Runs on http://127.0.0.1:3000
 
 # Terminal 2: Frontend
-cd packages/client && npx vite
-# Opens on http://localhost:5173 (or next available port)
+npm run dev --workspace=packages/client
+# Opens on http://localhost:5173
 ```
 
 **Common Issues:**
 
-1. **API calls failing** - Ensure Vite proxy is configured and backend is running on port 8787
-2. **WebSocket not connecting** - Check that backend is running and accessible
+1. **API calls failing** - Ensure Vite proxy is configured and backend is running on port 3000
+2. **WebSocket not connecting** - Check that backend is running and accessible at port 3000
 3. **Blank screen on game load** - Check browser console for errors, verify null state handling
 
 ## WebMCP Integration

@@ -5,7 +5,7 @@ import {
   type BrowserContext,
   type Browser,
 } from "@playwright/test";
-import { setupGame } from "../helpers/game.js";
+import { setupGame, waitForGameStateSettled } from "../helpers/game.js";
 
 // Serializable subset of the game state for assertions
 interface SerializedRobot {
@@ -81,16 +81,7 @@ export const test = base.extend<{ gameBoard: GameBoard; gameWithPlayers: GameWit
       },
 
       async waitForAnimations() {
-        await page.waitForFunction(async () => {
-          const a = (window as any).animator;
-          if (!a || !a.isAnimating()) {
-            // Wait two frames to be sure
-            await new Promise((r) => requestAnimationFrame(r));
-            await new Promise((r) => requestAnimationFrame(r));
-            return !a || !a.isAnimating();
-          }
-          return false;
-        });
+        await waitForGameStateSettled(page);
       },
 
       async waitForRobotCount(count: number) {

@@ -44,8 +44,17 @@ export async function registerUser(
 
   await page.locator("#submit-btn").click();
 
+  // Wait for either the modal to close (success) or an error to appear
+  await Promise.race([
+    page.locator(".login-modal").waitFor({ state: "hidden", timeout: 15_000 }),
+    page.locator("#auth-error").waitFor({ state: "visible", timeout: 15_000 }).then(async () => {
+      const error = await page.locator("#auth-error").textContent();
+      throw new Error(`Registration failed: ${error}`);
+    }),
+  ]);
+
   // Wait for dashboard to appear (indicates successful registration)
-  await page.locator(".dashboard-container").waitFor({ state: "visible", timeout: 10_000 });
+  await page.locator(".dashboard-container").waitFor({ state: "visible", timeout: 15_000 });
 
   return username;
 }

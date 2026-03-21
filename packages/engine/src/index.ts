@@ -6,3 +6,4 @@ export * from './moves.js';
 export * from './resolution.js';
 export * from './evaluator.js';
 export * from './ai.js';
+export * from './testing/index.js';

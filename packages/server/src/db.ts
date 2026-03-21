@@ -243,4 +243,15 @@ export const dbService = {
     `);
     return stmt.get(userId, gameCode) as GameRecord | null;
   },
+
+  // Dev-only: Reset all data (for testing)
+  resetDatabase(): void {
+    db.prepare("DELETE FROM games").run();
+    db.prepare("DELETE FROM users").run();
+  },
+
+  // Dev-only: Get raw database instance for testing
+  getDb(): Database.Database {
+    return db;
+  },
 };

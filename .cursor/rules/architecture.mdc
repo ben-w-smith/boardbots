@@ -7,9 +7,50 @@ globs: ["**/*"]
 
 ## Monorepo Boundaries
 
-- **Engine (`packages/engine/`)**: MUST remain completely pure. Absolutely zero I/O, network, or environment-specific dependencies (no `fetch`, no DOM, no Cloudflare imports). Only export pure functions, interfaces, and mathematical logic.
-- **Server (`packages/server/`)**: The authoritative game state manager. Depends on `engine` but NEVER on `client`. Handles all Cloudflare Durable Object and WebSocket logic.
+- **Engine (`packages/engine/`)**: MUST remain completely pure. Absolutely zero I/O, network, or environment-specific dependencies (no `fetch`, no DOM, no filesystem). Only export pure functions, interfaces, and mathematical logic.
+- **Server (`packages/server/`)**: The authoritative game state manager. Depends on `engine` but NEVER on `client`. Handles all HTTP, WebSocket, and SQLite database logic.
 - **Client (`packages/client/`)**: The Vite SPA. Depends on `engine` but NEVER on `server`. Handles purely presentation, canvas rendering, and WebSocket transport.
+
+## Tech Stack
+
+| Package | Technology |
+|---------|------------|
+| engine | TypeScript, Vitest |
+| client | Vite 7.x, Canvas API, WebSocket |
+| server | Express 4.x, ws, better-sqlite3 |
+| e2e | Playwright, Chromium |
+
+## Architecture Diagram
+
+```
++----------------+     WebSocket      +------------------+
+|  Client (Vite) | <----------------> | Server (Node.js) |
+|  - Canvas UI   |                    | - Express HTTP   |
+|  - Game state  |                    | - ws WebSocket   |
++----------------+                    | - SQLite DB      |
+         |                            +------------------+
+         |                                    |
+         v                                    v
++----------------------------------------------------+
+|              Engine (pure logic)                   |
+|  - Hex grid, moves, beam resolution, AI           |
++----------------------------------------------------+
+```
+
+**Key points:**
+- Engine is pure logic with no I/O dependencies
+- Client and Server both depend on Engine
+- Server holds authoritative game state and broadcasts updates
+- SQLite persists users and game history
+
+## Ports
+
+| Service | Port |
+|---------|------|
+| Client (Vite dev) | 5173 |
+| Server (Node.js) | 3000 |
+
+**Common mistake:** Do not reference port 8787 or Wrangler. The server uses Node.js on port 3000.
 
 ## Coding Style
 

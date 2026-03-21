@@ -1,0 +1,139 @@
+---
+description: "E2E testing rules for Playwright tests"
+globs: ["packages/e2e/**/*.ts"]
+---
+
+# E2E Testing Rules
+
+## Tech Stack
+
+- **Playwright** - Browser automation
+- **Chromium** - Browser (other browsers not configured)
+
+## Configuration
+
+Tests run sequentially (`workers: 1`) because they share server state. The config starts both server and client automatically via `webServer` configuration.
+
+**Key config settings:**
+- `fullyParallel: false` - Tests share state
+- `workers: 1` - Sequential execution
+- `baseURL: http://localhost:5173` - Client dev server
+- `timeout: 30_000` - Test timeout
+
+## Key Files
+
+| File | Purpose |
+|------|---------|
+| `playwright.config.ts` | Test configuration, web server setup |
+| `tests/*.spec.ts` | Test files (lobby, gameplay, multiplayer, auth, ai-game) |
+| `helpers/auth.ts` | Auth helpers (registerUser, loginUser, createAIGame) |
+| `helpers/lobby.ts` | Lobby helpers (createGame, joinGame, startGame) |
+| `helpers/game.ts` | Game setup helper (setupGame for two-player tests) |
+| `helpers/constants.ts` | Test constants (hex positions) |
+| `fixtures/game.ts` | Custom Playwright fixtures (gameBoard, gameWithPlayers) |
+
+## Test Patterns
+
+### Two-Player Game Setup
+
+Use the `gameWithPlayers` fixture for tests that need two players:
+
+```typescript
+test("my test", async ({ gameWithPlayers }) => {
+  const { hostPage, guestPage } = gameWithPlayers;
+  // Both players are in a game, ready to play
+});
+```
+
+Or use `setupGame(browser)` helper directly:
+
+```typescript
+const { hostCtx, guestCtx, hostPage, guestPage } = await setupGame(browser);
+// Don't forget to close contexts
+await hostCtx.close();
+await guestCtx.close();
+```
+
+### Custom Fixtures
+
+The `gameBoard` fixture provides helpers:
+
+```typescript
+test("game test", async ({ gameBoard, page }) => {
+  await gameBoard.clickHex(0, 5);  // Click hex at axial coords
+  await gameBoard.waitForTurn(0);  // Wait for player 0's turn
+  await gameBoard.waitForAnimations();
+  const state = await gameBoard.getGameState();
+});
+```
+
+### Auth Flow
+
+Use helpers for authentication:
+
+```typescript
+// Register new user (lands on dashboard)
+await registerUser(page, "username", "password");
+
+// Login existing user
+await loginUser(page, "username", "password");
+
+// Create AI game from dashboard
+await createAIGame(page, "medium");
+```
+
+### Waiting for Game State
+
+Use `waitForFunction` to wait for game state:
+
+```typescript
+await page.waitForFunction(
+  () => (window as any).gameState?.robots != null,
+  null,
+  { timeout: 10_000 },
+);
+```
+
+## Helper Functions
+
+### `helpers/auth.ts`
+
+- `generateTestUsername()` - Creates unique test usernames
+- `registerUser(page, username, password)` - Register and land on dashboard
+- `loginUser(page, username, password)` - Login existing user
+- `createAIGame(page, difficulty)` - Start AI game from dashboard
+
+### `helpers/lobby.ts`
+
+- `createGame(page, name)` - Create game, returns game code
+- `joinGame(page, code, name)` - Join existing game by code
+- `startGame(page)` - Start game (host only, needs 2 players)
+- `waitForGameView(page)` - Wait for transition to game view
+
+## Common Mistakes
+
+1. **Forgetting to close browser contexts** - Always close contexts after creating them manually.
+
+2. **Not waiting for async state** - Use `waitForFunction` to wait for game state changes.
+
+3. **Running tests in parallel** - Tests share server state, must run sequentially.
+
+4. **Hardcoded timeouts** - Use the fixture's `waitForAnimations()` instead of arbitrary waits.
+
+5. **Accessing gameState directly** - Use `getGameState()` fixture method for cross-context serialization.
+
+## Running Tests
+
+```bash
+# Run all E2E tests
+npm run test:e2e
+
+# Run specific test file
+npx playwright tests/lobby.spec.ts
+
+# Run with UI mode
+npx playwright test --ui
+
+# Update visual snapshots (after Phase 4)
+npx playwright test visual --update-snapshots
+```

@@ -727,4 +727,60 @@ export class GameRoom {
     return false;
   }
 
+  /**
+   * Dev-only: Directly set the game state from a TransportState
+   * This is used for testing and e2e scenarios
+   */
+  public setGameState(transportState: TransportState): void {
+    // Convert TransportState to GameState
+    // TransportState uses 1-indexed playerTurn, GameState uses 0-indexed
+    // TransportState robots are in entry format [Pair, TransportRobot]
+    this.persisted.gameState = {
+      gameDef: transportState.gameDef,
+      players: transportState.players,
+      robots: transportState.robots.map(([position, robot]) => ({
+        position,
+        direction: robot.dir,
+        isBeamEnabled: robot.isBeamEnabled,
+        isLockedDown: robot.isLocked,
+        player: robot.player - 1, // Convert from 1-indexed to 0-indexed
+      })),
+      playerTurn: transportState.playerTurn - 1, // Convert from 1-indexed to 0-indexed
+      movesThisTurn: transportState.movesThisTurn,
+      requiresTieBreak: transportState.requiresTieBreak,
+      winner: transportState.status === "OnGoing" ? -1 : parseInt(transportState.status, 10) - 1,
+    };
+
+    // Update phase based on game status
+    if (this.persisted.gameState.winner !== -1) {
+      this.persisted.phase = "finished";
+    } else if (this.persisted.phase === "waiting") {
+      this.persisted.phase = "playing";
+    }
+
+    this.saveState();
+    this.broadcastGameState();
+  }
+
+  /**
+   * Dev-only: Get the current room state (for debugging/testing)
+   */
+  public getRoomState(): {
+    gameCode: string;
+    phase: string;
+    gameState: GameState | null;
+    players: Array<{ name: string; index: number; connected: boolean }>;
+  } {
+    return {
+      gameCode: this.gameCode,
+      phase: this.persisted.phase,
+      gameState: this.persisted.gameState,
+      players: Array.from(this.persisted.players.values()).map((p) => ({
+        name: p.name,
+        index: p.index,
+        connected: p.connected,
+      })),
+    };
+  }
+
 }

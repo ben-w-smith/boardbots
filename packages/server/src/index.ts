@@ -9,6 +9,7 @@ import { fileURLToPath } from "url";
 import { RoomManager } from "./RoomManager.js";
 import { authRoutes, verifyToken, validateJwtSecret, requireAuth, csrfProtection } from "./auth/index.js";
 import { dbService } from "./db.js";
+import devRoutes from "./dev/routes.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -84,6 +85,9 @@ app.get("/api/health", (req, res) => {
 
 // Auth routes
 app.use("/api/auth", authRoutes);
+
+// Dev-only routes (protected by environment check)
+app.use("/api/dev", devRoutes);
 
 // Create a new game lobby (requires authentication)
 app.post("/api/lobby/create", requireAuth, (req, res) => {
