@@ -1,3 +1,9 @@
+---
+name: deploy
+description: Deploy BoardBots to DigitalOcean production server
+user-invocable: true
+---
+
 # Deploy Skill
 
 Deploy BoardBots to DigitalOcean production server.
