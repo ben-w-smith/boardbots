@@ -746,7 +746,7 @@ export class GameRoom {
         player: robot.player - 1, // Convert from 1-indexed to 0-indexed
       })),
       playerTurn: transportState.playerTurn - 1, // Convert from 1-indexed to 0-indexed
-      movesThisTurn: transportState.movesThisTurn,
+      movesThisTurn: transportState.gameDef.movesPerTurn - transportState.movesThisTurn, // Convert from transport format
       requiresTieBreak: transportState.requiresTieBreak,
       winner: transportState.status === "OnGoing" ? -1 : parseInt(transportState.status, 10) - 1,
     };
