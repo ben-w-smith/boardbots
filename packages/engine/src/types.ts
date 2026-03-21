@@ -51,6 +51,8 @@ export interface GameState {
   winner: number;              // -1 = ongoing
   /** @internal Position of robot being moved — skip during resolution */
   _activeRobotPosition?: Pair;
+  /** All moves from the previous turn (for UI highlighting) */
+  lastTurnMoves?: LastTurnMoves;
 }
 
 // Move types — discriminated union
@@ -78,10 +80,25 @@ export interface TransportState {
   status: string;        // "OnGoing" | winner number as string
   movesThisTurn: number;
   requiresTieBreak: boolean;
+  /** All moves from the previous turn (for UI highlighting) */
+  lastTurnMoves?: LastTurnMoves;
 }
 
 // TieBreak state when multiple robots can be targeted
 export interface TieBreak {
   robots: Robot[];
   state: string;
+}
+
+/** A single move from a player's turn */
+export interface TurnMove {
+  type: 'place' | 'advance' | 'turn';
+  position: Pair;         // Primary position (where robot is/was)
+  destination?: Pair;     // For advance: where robot moved to
+}
+
+/** All moves from a player's turn for highlighting */
+export interface LastTurnMoves {
+  player: number;
+  moves: TurnMove[];
 }

@@ -56,6 +56,7 @@ function generatePlayerName(): string {
 let state = createGame(GAME_DEF);
 let previousState: GameState | null = null;
 let highlights: Highlight[] = [];
+let lastTurnHighlights: Highlight[] = [];  // Highlights for opponent's last turn moves
 let inputState: InputState;
 let isConnected = false;
 let myPlayerIndex = 0;
@@ -370,6 +371,9 @@ socket.onStateUpdate(
         }
       }
 
+      // Update last turn highlights for opponent's moves
+      updateLastTurnHighlights();
+
       // Detect changes and trigger animations
       detectAndAnimateChanges();
 
@@ -555,9 +559,33 @@ function handleContextMenu(event: MouseEvent) {
   inputHandler.cancelSelection();
 }
 
+// Update last turn highlights from opponent's moves
+function updateLastTurnHighlights() {
+  lastTurnHighlights = [];
+
+  // Only show highlights if we have lastTurnMoves and it was the opponent's turn
+  if (state.lastTurnMoves && state.lastTurnMoves.player !== myPlayerIndex) {
+    for (const move of state.lastTurnMoves.moves) {
+      // Add the primary position
+      lastTurnHighlights.push({
+        position: move.position,
+        type: "lastMove" as const,
+      });
+
+      // For advance moves, also highlight the destination
+      if (move.destination) {
+        lastTurnHighlights.push({
+          position: move.destination,
+          type: "lastMove" as const,
+        });
+      }
+    }
+  }
+}
+
 // Update highlights based on input state
 function updateHighlights() {
-  highlights = [];
+  highlights = [...lastTurnHighlights]; // Start with last turn highlights
 
   if (inputState.mode === "select" && inputState.selectedRobot) {
     highlights.push({
@@ -911,4 +939,6 @@ Object.assign(window as unknown as Record<string, unknown>, {
   dashboardUI,
   authManager,
   animator,
+  getHighlights: () => highlights, // For testing
+  getMyPlayerIndex: () => myPlayerIndex, // For testing
 });

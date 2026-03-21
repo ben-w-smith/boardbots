@@ -546,6 +546,8 @@ export class GameUI {
       const isActive = this.gameState.playerTurn === i;
       const isAI = this.aiEnabled && i === this.aiPlayerIndex;
       playerEl.classList.toggle('active-player', isActive);
+      playerEl.classList.toggle('player-1-active', isActive && i === 0);
+      playerEl.classList.toggle('player-2-active', isActive && i === 1);
       playerEl.classList.toggle('ai-player', isAI);
 
       // Show AI badge

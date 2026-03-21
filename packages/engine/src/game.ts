@@ -9,6 +9,8 @@ import type {
   TransportState,
   TransportRobot,
   TransportRobotEntry,
+  TurnMove,
+  LastTurnMoves,
 } from "./types.js";
 import { pairDist, pairEq, pairKey, pairAdd, pairRotate, inBounds } from "./hex.js";
 import { resolveMove } from "./resolution.js";
@@ -68,6 +70,14 @@ export function cloneState(state: GameState): GameState {
     _activeRobotPosition: state._activeRobotPosition
       ? { ...state._activeRobotPosition }
       : undefined,
+    lastTurnMoves: state.lastTurnMoves ? {
+      player: state.lastTurnMoves.player,
+      moves: state.lastTurnMoves.moves.map(m => ({
+        type: m.type,
+        position: { ...m.position },
+        destination: m.destination ? { ...m.destination } : undefined,
+      })),
+    } : undefined,
   };
 }
 
@@ -82,17 +92,43 @@ export function applyMove(state: GameState, move: GameMove): GameState {
   // Clone state for immutability
   const newState = cloneState(state);
 
+  // Track the move for turn highlighting
+  const turnMove: TurnMove = {
+    type: move.type,
+    position: { ...move.position },
+  };
+
+  // For advance moves, we need to find the destination after execution
+  let advanceDestination: Pair | undefined;
+
   // Execute the move based on type
   switch (move.type) {
     case "place":
       executePlace(newState, move);
       break;
-    case "advance":
+    case "advance": {
+      // Find the robot before advancing to get its direction
+      const robot = robotAt(newState, move.position);
+      if (robot) {
+        advanceDestination = pairAdd(robot.position, robot.direction);
+      }
       executeAdvance(newState, move);
+      turnMove.destination = advanceDestination;
       break;
+    }
     case "turn":
       executeTurn(newState, move);
       break;
+  }
+
+  // Initialize or update lastTurnMoves tracking
+  if (!newState.lastTurnMoves || newState.lastTurnMoves.player !== move.player) {
+    newState.lastTurnMoves = {
+      player: move.player,
+      moves: [turnMove],
+    };
+  } else {
+    newState.lastTurnMoves.moves.push(turnMove);
   }
 
   // Resolve beam interactions
@@ -308,6 +344,7 @@ export function toTransport(state: GameState): TransportState {
     status,
     movesThisTurn: state.gameDef.movesPerTurn - state.movesThisTurn,
     requiresTieBreak: state.requiresTieBreak,
+    lastTurnMoves: state.lastTurnMoves,
   };
 }
 
@@ -342,5 +379,6 @@ export function fromTransport(transport: TransportState): GameState {
     movesThisTurn: transport.gameDef.movesPerTurn - transport.movesThisTurn,
     requiresTieBreak: transport.requiresTieBreak,
     winner,
+    lastTurnMoves: transport.lastTurnMoves,
   };
 }

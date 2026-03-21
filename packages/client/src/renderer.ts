@@ -22,6 +22,7 @@ interface ColorScheme {
   beamColor: string;
   selectedGlow: string;
   validMove: string;
+  lastMoveHighlight: string;
 }
 
 const DEFAULT_COLORS: ColorScheme = {
@@ -37,6 +38,7 @@ const DEFAULT_COLORS: ColorScheme = {
   beamColor: "rgba(255, 255, 100, 0.6)",
   selectedGlow: "#00FF88",
   validMove: "rgba(0, 255, 136, 0.3)",
+  lastMoveHighlight: "rgba(255, 200, 0, 0.35)",
 };
 
 /** Convert a direction Pair to angle in radians (flat-top hex layout) */
@@ -49,7 +51,7 @@ export function directionToAngle(direction: Pair): number {
 
 export interface Highlight {
   position: Pair;
-  type: "selected" | "validMove";
+  type: "selected" | "validMove" | "lastMove";
 }
 
 interface Star {
@@ -627,7 +629,7 @@ export class BoardRenderer {
   /** Draw highlight on a hex */
   private drawHighlight(
     position: Pair,
-    type: "selected" | "validMove",
+    type: "selected" | "validMove" | "lastMove",
     now: number,
   ): void {
     const { x, y } = this.hexToPixel(position.q, position.r);
@@ -664,6 +666,20 @@ export class BoardRenderer {
       ctx.fillStyle = `rgba(0, 255, 136, ${alpha * 0.8})`;
       ctx.fill();
       ctx.shadowBlur = 0;
+    } else if (type === "lastMove") {
+      // Draw yellow highlight for opponent's last move
+      const radius = this.hexSize * 0.85;
+
+      // Semi-transparent yellow fill
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fillStyle = this.colors.lastMoveHighlight;
+      ctx.fill();
+
+      // Add subtle pulsing border
+      ctx.strokeStyle = `rgba(255, 200, 0, ${0.5 + pulse * 0.1})`;
+      ctx.lineWidth = 2;
+      ctx.stroke();
     }
   }
 
