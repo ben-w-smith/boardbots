@@ -4,6 +4,7 @@
  */
 
 import { authManager } from './auth.js';
+import { escapeHtml } from './utils/html.js';
 
 export interface TopBarOptions {
   container: HTMLElement;
@@ -60,7 +61,7 @@ export class TopBar {
           <button class="topbar-link" data-route="dashboard">Dashboard</button>
         </nav>
         <div class="topbar-user">
-          <div class="topbar-avatar">${this.escapeHtml(initials)}</div>
+          <div class="topbar-avatar">${escapeHtml(initials)}</div>
           <button class="topbar-link" id="topbar-logout">Logout</button>
         </div>
       `;
@@ -112,11 +113,5 @@ export class TopBar {
 
   private getInitials(username: string): string {
     return username.slice(0, 2).toUpperCase();
-  }
-
-  private escapeHtml(text: string): string {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
   }
 }

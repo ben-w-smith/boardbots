@@ -309,12 +309,9 @@ export class GameSocket {
     }, 10000);
   }
 
-  private send(msg: unknown): void{
-    console.log("[WebSocket] Sending message:", JSON.stringify(msg));
+  private send(msg: unknown): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(msg));
-    } else {
-      console.warn("[WebSocket] Cannot send - readyState:", this.ws?.readyState);
     }
   }
 
