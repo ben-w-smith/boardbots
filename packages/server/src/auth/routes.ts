@@ -12,6 +12,15 @@ import { loginLimiter, registerLimiter } from "./rate-limiter.js";
 
 const router = Router();
 
+/** Cookie options for refresh token */
+const REFRESH_TOKEN_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "strict" as const,
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  path: "/",
+};
+
 /**
  * Reserved usernames that cannot be registered
  */
@@ -105,13 +114,7 @@ router.post(
       });
 
       // Set refresh token as httpOnly cookie
-      res.cookie("refreshToken", tokens.refreshToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-        path: "/",
-      });
+      res.cookie("refreshToken", tokens.refreshToken, REFRESH_TOKEN_COOKIE_OPTIONS);
 
       res.status(201).json({
         user: { id: user.id, username: user.username },
@@ -159,13 +162,7 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
     const tokens = generateTokenPair({ userId: user.id, username: user.username });
 
     // Set refresh token as httpOnly cookie
-    res.cookie("refreshToken", tokens.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      path: "/",
-    });
+    res.cookie("refreshToken", tokens.refreshToken, REFRESH_TOKEN_COOKIE_OPTIONS);
 
     res.json({
       user: { id: user.id, username: user.username },
@@ -206,13 +203,7 @@ router.post("/refresh", async (req: Request, res: Response) => {
     const tokens = generateTokenPair({ userId: user.id, username: user.username });
 
     // Set new refresh token as httpOnly cookie
-    res.cookie("refreshToken", tokens.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      path: "/",
-    });
+    res.cookie("refreshToken", tokens.refreshToken, REFRESH_TOKEN_COOKIE_OPTIONS);
 
     res.json({
       user: { id: user.id, username: user.username },

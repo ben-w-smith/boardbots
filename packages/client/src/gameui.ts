@@ -2,6 +2,7 @@ import type { GameState, GameMove, Pair, TransportState } from '@lockitdown/engi
 import { fromTransport, pairKey } from '@lockitdown/engine';
 import type { InputState } from './input.js';
 import type { ConnectionStatus } from './websocket.js';
+import { escapeHtml } from './utils/html.js';
 
 export interface GameUIOptions {
   /** Container element for the UI */
@@ -627,9 +628,11 @@ export class GameUI {
     const entriesEl = this.rightPanel.querySelector('#move-log-entries');
     if (!entriesEl) return;
 
-    entriesEl.innerHTML = this.moveHistory
-      .slice(-20) // Last 20 moves
-      .map((move, i) => `<div class="move-entry">${this.moveHistory.length - this.moveHistory.slice(-20).length + i + 1}. ${this.escapeHtml(move)}</div>`)
+    const recentMoves = this.moveHistory.slice(-20);
+    const startIndex = this.moveHistory.length - recentMoves.length;
+
+    entriesEl.innerHTML = recentMoves
+      .map((move, i) => `<div class="move-entry">${startIndex + i + 1}. ${escapeHtml(move)}</div>`)
       .join('');
 
     // Scroll to bottom
@@ -657,10 +660,4 @@ export class GameUI {
     return infos;
   }
 
-  /** Escape HTML for safe rendering */
-  private escapeHtml(text: string): string {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
 }

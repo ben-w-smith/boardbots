@@ -15,6 +15,7 @@ import {
   type GameHistoryResponse,
 } from './api/games.js';
 import type { ConnectionStatus } from './websocket.js';
+import { escapeHtml } from './utils/html.js';
 
 export interface DashboardOptions {
   container: HTMLElement;
@@ -171,7 +172,7 @@ export class DashboardUI {
     return `
       <div class="user-profile">
         <div class="user-avatar">${initial}</div>
-        <h2 class="user-name">${this.escapeHtml(user.username)}</h2>
+        <h2 class="user-name">${escapeHtml(user.username)}</h2>
       </div>
     `;
   }
@@ -433,7 +434,7 @@ export class DashboardUI {
       <div class="game-card ${isActive ? 'active' : ''} ${isArchived ? 'archived' : ''} ${resultClass}" data-game-code="${game.gameCode}">
         <div class="game-card-info">
           <div class="game-card-header">
-            <span class="opponent-name">${this.escapeHtml(opponent)}</span>
+            <span class="opponent-name">${escapeHtml(opponent)}</span>
             ${resultText ? `<span class="result-badge ${resultClass}">${resultText}</span>` : ''}
             ${game.aiEnabled ? '<span class="ai-badge">AI</span>' : ''}
             ${isArchived ? '<span class="archived-badge">Archived</span>' : ''}
@@ -634,12 +635,5 @@ export class DashboardUI {
   private showError(message: string): void {
     // For now, use alert. Could be replaced with a toast notification.
     alert(message);
-  }
-
-  /** Escape HTML for safe rendering */
-  private escapeHtml(text: string): string {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
   }
 }

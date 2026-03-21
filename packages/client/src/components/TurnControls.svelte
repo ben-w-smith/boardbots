@@ -5,14 +5,19 @@
   export let selectedPosition: Pair | null = null;
   export let isMyTurn: boolean = false;
   export let canAdvance: boolean = false;
+  export let onTurnLeft: () => void = () => {};
+  export let onTurnRight: () => void = () => {};
+  export let onAdvance: () => void = () => {};
+  export let onCancel: () => void = () => {};
 
-  $: isMyTurn =</script>
+  $: isVisible = isMyTurn;
+</script>
 
-<div class="turn-controls" class:hidden={!isMyTurn}">
+<div class="turn-controls" class:hidden={!isVisible}">
   <button
     class="action-btn"
     title="Turn Left"
-    on:click
+    on:click={onTurnLeft}
     disabled={!selectedPosition}
   >
     <span>↶ Turn L</span>
@@ -21,7 +26,7 @@
   <button
     class="action-btn primary"
     title="Advance"
-    on:click
+    on:click={onAdvance}
     disabled={!canAdvance}
   >
     <span>↑ Advance</span>
@@ -30,7 +35,7 @@
   <button
     class="action-btn"
     title="Turn Right"
-    on:click
+    on:click={onTurnRight}
     disabled={!selectedPosition}
   >
     <span>↷ Turn R</span>
@@ -40,7 +45,7 @@
     <button
       class="action-btn danger"
       title="Cancel"
-      on:click
+      on:click={onCancel}
     >
       <span>Cancel</span>
     </button>

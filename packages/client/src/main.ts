@@ -244,38 +244,7 @@ const dashboardUI = new DashboardUI({
     playerName: string,
     aiDepth: number,
   ): Promise<string | null> => {
-    console.log("[AI Game] onCreateAIGame called, playerName:", playerName, "aiDepth:", aiDepth);
-    currentPlayerName = playerName;
-    savePlayerName(playerName);
-
-    try {
-      // Create game using authenticated fetch
-      console.log("[AI Game] Creating lobby...");
-      const response = await authManager.authFetch("/api/lobby/create", {
-        method: "POST",
-      });
-      console.log("[AI Game] Lobby response status:", response.status);
-      if (response.status === 401) {
-        // Not authenticated - show login modal
-        loginModal.show("login");
-        return null;
-      }
-      if (response.ok) {
-        const data = await response.json();
-        const gameCode = data.gameCode;
-        console.log("[AI Game] Got game code:", gameCode);
-
-        // Connect to the game and start AI game once join is confirmed
-        console.log("[AI Game] Connecting WebSocket...");
-        socket.connect(gameCode, playerName);
-        socket.startAIGameWhenJoined(aiDepth);
-
-        return gameCode;
-      }
-    } catch (error) {
-      console.error("[AI Game] Failed to create AI game:", error);
-    }
-    return null;
+    return handleCreateAIGame(playerName, aiDepth);
   },
   onJoinGame: (gameCode: string, playerName: string) => {
     currentPlayerName = playerName;
@@ -291,6 +260,32 @@ const dashboardUI = new DashboardUI({
     lobbyUI.show();
   },
 });
+
+/** Shared handler for creating AI games (used by both dashboard and lobby) */
+async function handleCreateAIGame(playerName: string, aiDepth: number): Promise<string | null> {
+  currentPlayerName = playerName;
+  savePlayerName(playerName);
+
+  try {
+    const response = await authManager.authFetch("/api/lobby/create", {
+      method: "POST",
+    });
+    if (response.status === 401) {
+      loginModal.show("login");
+      return null;
+    }
+    if (response.ok) {
+      const data = await response.json();
+      const gameCode = data.gameCode;
+      socket.connect(gameCode, playerName);
+      socket.startAIGameWhenJoined(aiDepth);
+      return gameCode;
+    }
+  } catch (error) {
+    console.error("Failed to create AI game:", error);
+  }
+  return null;
+}
 
 // Initialize lobby UI (for non-authenticated users)
 const lobbyUI = new LobbyUI({
@@ -320,38 +315,7 @@ const lobbyUI = new LobbyUI({
     playerName: string,
     aiDepth: number,
   ): Promise<string | null> => {
-    console.log("[AI Game] onCreateAIGame called, playerName:", playerName, "aiDepth:", aiDepth);
-    currentPlayerName = playerName;
-    savePlayerName(playerName);
-
-    try {
-      // Create game using authenticated fetch
-      console.log("[AI Game] Creating lobby...");
-      const response = await authManager.authFetch("/api/lobby/create", {
-        method: "POST",
-      });
-      console.log("[AI Game] Lobby response status:", response.status);
-      if (response.status === 401) {
-        // Not authenticated - show login modal
-        loginModal.show("login");
-        return null;
-      }
-      if (response.ok) {
-        const data = await response.json();
-        const gameCode = data.gameCode;
-        console.log("[AI Game] Got game code:", gameCode);
-
-        // Connect to the game and start AI game once join is confirmed
-        console.log("[AI Game] Connecting WebSocket...");
-        socket.connect(gameCode, playerName);
-        socket.startAIGameWhenJoined(aiDepth);
-
-        return gameCode;
-      }
-    } catch (error) {
-      console.error("[AI Game] Failed to create AI game:", error);
-    }
-    return null;
+    return handleCreateAIGame(playerName, aiDepth);
   },
   onJoinGame: (gameCode: string, playerName: string) => {
     currentPlayerName = playerName;
