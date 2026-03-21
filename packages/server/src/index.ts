@@ -40,17 +40,21 @@ app.use(helmet({
 }));
 
 // CORS configuration
-const allowedOrigins = [
-  "http://138.197.0.105",
-  "http://boardbots.benwsmith.com",
+const defaultOrigins = [
   "https://boardbots.benwsmith.com",
+  "http://boardbots.benwsmith.com",
+  "http://138.197.0.105",
 ];
+
+const allowedOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map(s => s.trim())
+  : defaultOrigins;
 
 app.use(cors({
   origin: (origin, callback) => {
     // Allow any localhost port for development
     const isLocalhost = origin && /^http:\/\/localhost:\d+$/.test(origin);
-    if (!origin || allowedOrigins.includes(origin) || isLocalhost) {
+    if (!origin || isLocalhost || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       callback(new Error("Not allowed by CORS"));
