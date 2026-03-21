@@ -11,11 +11,15 @@ declare global {
 }
 
 // Allowed origins for CSRF protection
-const ALLOWED_ORIGINS = [
-  "http://138.197.0.105",
-  "http://boardbots.benwsmith.com",
+const defaultOrigins = [
   "https://boardbots.benwsmith.com",
+  "http://boardbots.benwsmith.com",
+  "http://138.197.0.105",
 ];
+
+const ALLOWED_ORIGINS = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map(s => s.trim())
+  : defaultOrigins;
 
 /**
  * CSRF protection middleware

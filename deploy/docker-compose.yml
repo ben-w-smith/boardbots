@@ -15,7 +15,7 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - DATABASE_PATH=/app/data/boardbots.db
-      - CORS_ORIGIN=${CORS_ORIGIN:-http://138.197.0.105}
+      - CORS_ORIGIN=${CORS_ORIGIN:-https://boardbots.benwsmith.com}
     volumes:
       # Mount volume for SQLite persistence
       - ./data:/app/data

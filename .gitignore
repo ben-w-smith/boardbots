@@ -21,3 +21,6 @@ test-results/
 # Test/debug screenshots
 *.png
 !board-landscape.png
+
+# Deploy environment (contains secrets)
+.env.deploy
