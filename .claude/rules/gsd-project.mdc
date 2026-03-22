@@ -1,0 +1,206 @@
+# BoardBots GSD Project Configuration
+
+This file configures the GSD workflow for the BoardBots project.
+
+---
+
+## Package Manager
+
+```
+PKG_MGR=npm
+```
+
+---
+
+## Commands
+
+| Purpose | Command |
+|---------|---------|
+| TypeScript check | `npm run build` |
+| Lint check | `npm run lint` (if available) |
+| Lint fix | `npm run lint -- --fix` (if available) |
+| Unit tests (targeted) | `npm run test --workspace=packages/engine -- [file]` |
+| Unit tests (global) | `npm run test --workspaces --if-present` |
+| E2E tests | `npm run test:e2e` |
+
+---
+
+## Base Branch
+
+```
+BASE_BRANCH=main
+```
+
+---
+
+## GSD Workflow Variant
+
+**This project uses: `build-gsd-cmux`**
+
+Instead of `/build-gsd`, use `/build-gsd-cmux` for the BUILD stage.
+
+**Why**: Cmux ad-hoc browser testing is easier for AI reasoning and provides visual confirmation in the terminal. The working selectors/timing are documented for the VERIFY stage to codify into Playwright tests.
+
+---
+
+## Cmux-Specific Configuration
+
+### Services
+
+| Service | Port | Start Command |
+|---------|------|---------------|
+| Server | 3000 | `npm run dev --workspace=packages/server` |
+| Client | 5173 | `npm run dev --workspace=packages/client` |
+
+### Test URL
+
+```
+http://localhost:5173
+```
+
+### Browser Surface Setup
+
+```bash
+# Start services in split panes
+cmux new-split right
+# Left pane: server
+cmux send-surface --surface <left> "npm run dev --workspace=packages/server"
+# Right pane: split for client
+cmux send-surface --surface <right> "cmux new-split down"
+cmux send-surface --surface <bottom-right> "npm run dev --workspace=packages/client"
+
+# Wait for services (8 seconds)
+sleep 8
+
+# Open browser for testing
+cmux browser open http://localhost:5173
+```
+
+---
+
+## Known Selectors (BoardBots)
+
+Use these selectors for Cmux ad-hoc testing and Playwright tests:
+
+### Landing Page
+- Register button: `#btn-register`
+- Login button: `#btn-login`
+
+### Auth Modal
+- Username input: `#auth-username`
+- Password input: `#auth-password`
+- Confirm password: `#auth-confirm`
+- Submit button: `#submit-btn`
+- Modal container: `.login-modal`
+
+### Dashboard
+- Container: `.dashboard-container`
+- New game button: `#btn-new-game`
+- Logout button: `#btn-logout`
+
+### Lobby
+- Container: `.lobby-container`
+- Game name input: `#game-name`
+- Create game button: `#btn-create`
+- Start game button: `#btn-start-game`
+- Waiting text: "Waiting for players"
+
+### Game
+- Canvas element: `#game-canvas`
+- Turn indicator: `.turn-indicator`
+- Robot placement: Click canvas at coordinates
+
+---
+
+## Test Flow Templates
+
+### Registration Flow
+
+```bash
+cmux browser surface:<id> click "#btn-register"
+cmux browser surface:<id> fill "#auth-username" --text "testuser_$(date +%s)"
+cmux browser surface:<id> fill "#auth-password" --text "TestPass123"
+cmux browser surface:<id> fill "#auth-confirm" --text "TestPass123"
+cmux browser surface:<id> click "#submit-btn"
+cmux browser surface:<id> wait --text "Dashboard" --timeout-ms 5000
+cmux browser surface:<id> is visible ".dashboard-container"
+```
+
+### Create Game Flow
+
+```bash
+cmux browser surface:<id> click "#btn-new-game"
+cmux browser surface:<id> fill "#game-name" --text "Test Game"
+cmux browser surface:<id> click "#btn-create"
+cmux browser surface:<id> wait --text "Waiting for players"
+```
+
+### Login Flow
+
+```bash
+cmux browser surface:<id> click "#btn-login"
+cmux browser surface:<id> fill "#auth-username" --text "<existing-username>"
+cmux browser surface:<id> fill "#auth-password" --text "<password>"
+cmux browser surface:<id> click "#submit-btn"
+cmux browser surface:<id> wait --text "Dashboard"
+```
+
+---
+
+## VERIFY Stage: Cmux to Playwright
+
+When running `/verify-gsd`, read Section 9 (Cmux Ad-Hoc Test Log) from the plan file to get:
+
+1. **Working selectors** - Use these in Playwright page objects
+2. **Timing observations** - Set appropriate timeouts
+3. **Console errors** - Address any issues found during testing
+
+### Example Translation
+
+**Cmux ad-hoc**:
+```bash
+cmux browser surface:2 click "#btn-register"
+cmux browser surface:2 fill "#auth-username" --text "testuser"
+cmux browser surface:2 click "#submit-btn"
+cmux browser surface:2 wait --text "Dashboard" --timeout-ms 5000
+```
+
+**Playwright test**:
+```typescript
+test("user can register", async ({ page }) => {
+  await page.goto("/");
+  await page.locator("#btn-register").click();
+  await page.locator("#auth-username").fill("testuser");
+  await page.locator("#submit-btn").click();
+  await expect(page.locator(".dashboard-container")).toBeVisible({ timeout: 5000 });
+});
+```
+
+---
+
+## API Contract
+
+N/A - BoardBots uses WebSockets for real-time game state. No REST API contract verification needed.
+
+---
+
+## Architecture Notes
+
+- Engine is pure logic with no I/O dependencies
+- Client and Server both depend on Engine
+- Server holds authoritative game state and broadcasts updates
+- SQLite persists active game rooms
+- WebSocket connection required for gameplay
+
+---
+
+## Monorepo Package Ownership
+
+When spawning teammates for parallel work:
+
+| Role | Owns | Avoids |
+|------|------|--------|
+| engine-dev | `packages/engine/**/*.ts` | client, server, e2e |
+| client-dev | `packages/client/**/*.ts` | engine, server |
+| server-dev | `packages/server/**/*.ts` | engine, client |
+| e2e-tester | `packages/e2e/**/*.ts` | src files |
