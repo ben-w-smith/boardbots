@@ -153,4 +153,90 @@ describe("Robot Destruction and Locks", () => {
     expect(robotC).toBeDefined();
     expect(robotC?.isLockedDown).toBe(true); // Should be locked immediately after turn
   });
+
+  it("unlocks robot when attacker becomes locked (chain unlock)", () => {
+    // Chain unlock scenario:
+    // - Robot X (Player 0) is locked by Robot A and Robot B (both Player 1)
+    // - Robot D (Player 0) turns to also target Robot A
+    // - Robot E (Player 0) is already targeting Robot A
+    // - Now Robot A has 2 attackers (D and E) -> Robot A gets locked
+    // - Robot A's beam is disabled
+    // - Robot X now has only 1 attacker (Robot B) -> Robot X should be UNLOCKED
+
+    const state = createGame(GAME_DEF);
+    state.movesThisTurn = 3;
+    state.playerTurn = 0;
+
+    // Robot X (Player 0) - the victim, locked by 2 attackers
+    state.robots.push({
+      position: { q: 0, r: 0 },  // Center
+      direction: { q: 0, r: -1 },
+      isBeamEnabled: false,
+      isLockedDown: true,  // Already locked!
+      player: 0,
+    });
+
+    // Robot A (Player 1) - first attacker, targeting Robot X from the south
+    state.robots.push({
+      position: { q: 0, r: 2 },  // South of Robot X
+      direction: { q: 0, r: -1 }, // Facing N toward Robot X
+      isBeamEnabled: true,
+      isLockedDown: false,
+      player: 1,
+    });
+
+    // Robot B (Player 1) - second attacker, targeting Robot X from the east
+    state.robots.push({
+      position: { q: 2, r: 0 },  // East of Robot X
+      direction: { q: -1, r: 0 }, // Facing W toward Robot X
+      isBeamEnabled: true,
+      isLockedDown: false,
+      player: 1,
+    });
+
+    // Robot D (Player 0) - will turn to target Robot A
+    state.robots.push({
+      position: { q: 0, r: 4 },  // South of Robot A
+      direction: { q: 1, r: -1 }, // Facing NE (not targeting Robot A yet)
+      isBeamEnabled: true,
+      isLockedDown: false,
+      player: 0,
+    });
+
+    // Robot E (Player 0) - already targeting Robot A from the WEST
+    // (Not from north because Robot X is in the way at (0, 0))
+    state.robots.push({
+      position: { q: -2, r: 2 }, // West of Robot A (at 0, 2)
+      direction: { q: 1, r: 0 }, // Facing E toward Robot A
+      isBeamEnabled: true,
+      isLockedDown: false,
+      player: 0,
+    });
+
+    // Verify initial state: Robot X is locked
+    const robotXBefore = state.robots.find((r) => r.position.q === 0 && r.position.r === 0);
+    expect(robotXBefore?.isLockedDown).toBe(true);
+
+    // Robot D turns LEFT to face N toward Robot A
+    // From {1, -1} (NE) turning LEFT gives {0, -1} (N)
+    const turnMove: GameMove = {
+      type: "turn",
+      player: 0,
+      position: { q: 0, r: 4 },
+      direction: "left",
+    };
+
+    const newState = applyMove(state, turnMove);
+
+    // KEY ASSERTIONS:
+    // 1. Robot A (attacker at 0, 2) should now be locked
+    const robotA = newState.robots.find((r) => r.position.q === 0 && r.position.r === 2);
+    expect(robotA?.isLockedDown).toBe(true); // Robot A is locked by D and E
+
+    // 2. Robot X (victim at 0, 0) should now be UNLOCKED
+    // Because Robot A's beam is disabled, Robot X only has 1 attacker (Robot B)
+    const robotX = newState.robots.find((r) => r.position.q === 0 && r.position.r === 0);
+    expect(robotX?.isLockedDown).toBe(false); // THIS IS THE BUG IF IT FAILS
+    expect(robotX?.isBeamEnabled).toBe(true); // Beam should be re-enabled
+  });
 });

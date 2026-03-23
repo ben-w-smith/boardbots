@@ -178,8 +178,14 @@ function updateLockedRobots(state: GameState, targeted: Map<number, number[]>): 
       resolved = false;
     } else if (attackers.length === 2) {
       // 2 attackers: lock down the robot
+      const wasLocked = robot.isLockedDown;
       robot.isBeamEnabled = false;
       robot.isLockedDown = true;
+
+      // State changed, need to reevaluate (locking a robot disables its beam)
+      if (!wasLocked) {
+        resolved = false;
+      }
     }
   }
 
