@@ -128,6 +128,31 @@ describe('findTargetedRobots', () => {
     // Corridor robot cannot attack, and arena robot targets friendlies
     expect(targeted.size).toBe(0);
   });
+
+  it('ignores corridor robots as targets', () => {
+    const state = createGame(defaultGameDef);
+    // Attacker in arena (distance 4), facing corridor where enemy is
+    state.robots = [
+      {
+        position: { q: 4, r: 0 }, // arena (dist=4)
+        direction: E,              // facing corridor
+        isBeamEnabled: true,
+        isLockedDown: false,
+        player: 0,
+      },
+      {
+        position: { q: 6, r: 0 }, // corridor (dist=6=arenaRadius+1)
+        direction: W,
+        isBeamEnabled: false,
+        isLockedDown: false,
+        player: 1, // enemy - but should NOT be targeted because in corridor
+      },
+    ];
+
+    const targeted = findTargetedRobots(state);
+    // Corridor robot should not be targeted even though it's an enemy in beam path
+    expect(targeted.size).toBe(0);
+  });
 });
 
 describe('resolveMove - locking', () => {

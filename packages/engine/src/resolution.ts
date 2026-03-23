@@ -55,6 +55,11 @@ export function findTargetedRobots(state: GameState): Map<number, number[]> {
 
       const target = state.robots[tIdx];
 
+      // Skip targets in the safety area (corridor) - they cannot be locked/destroyed
+      if (isCorridor(state, target.position)) {
+        continue;
+      }
+
       if (axisFn(attacker.position, target.position)) {
         const dist = pairDist({
           q: attacker.position.q - target.position.q,

@@ -1,5 +1,5 @@
 import type { GameState, Pair, Robot } from "@lockitdown/engine";
-import { pairAdd, pairDist, pairEq, pairSub } from "@lockitdown/engine";
+import { pairAdd, pairDist, pairEq } from "@lockitdown/engine";
 import type { Animator } from "./animator.js";
 
 export interface RenderOptions {
@@ -588,11 +588,12 @@ export class BoardRenderer {
     arenaRadius: number,
   ): Pair {
     const direction = sourceRobot.direction;
-    const boundary = arenaRadius + 1; // Include corridor
     let currentPos = pairAdd(sourceRobot.position, direction);
+    let lastArenaPos = sourceRobot.position; // Track last arena position
 
     // Step through hexes along the beam direction
-    while (pairDist(currentPos) <= boundary) {
+    // Stop at arena edge - beams don't enter corridor (safety area)
+    while (pairDist(currentPos) <= arenaRadius) {
       // Check if a robot is at this position (excluding the source robot)
       const robotAtPos = allRobots.find(
         (r) => pairEq(r.position, currentPos) && !pairEq(r.position, sourceRobot.position),
@@ -600,12 +601,13 @@ export class BoardRenderer {
       if (robotAtPos) {
         return currentPos;
       }
+      lastArenaPos = currentPos;
       // Move to next hex in direction
       currentPos = pairAdd(currentPos, direction);
     }
 
-    // Beam stopped at boundary - return the last valid position
-    return pairSub(currentPos, direction);
+    // Beam stopped at arena edge - return last arena position
+    return lastArenaPos;
   }
 
   /** Draw impact effect at beam stop point */
