@@ -3,6 +3,7 @@
  */
 
 import { BoardRenderer, type Highlight } from './renderer.js';
+import { StarRenderer } from './star-renderer.js';
 import { GameUI } from './gameui.js';
 import { InputHandler, type InputState } from './input.js';
 import { GameSocket, type ConnectionStatus } from './websocket.js';
@@ -58,6 +59,7 @@ export interface RouteComponent {
 export class App {
   private container: HTMLElement;
   private canvas: HTMLCanvasElement;
+  private starCanvas: HTMLCanvasElement;
 
   // Components
   private topBar: TopBar;
@@ -68,6 +70,7 @@ export class App {
   private loginPage: LoginPage;
   private registerPage: RegisterPage;
   private renderer: BoardRenderer;
+  private starRenderer: StarRenderer;
   private inputHandler: InputHandler;
   private socket: GameSocket;
   private audioManager: ReturnType<typeof getAudioManager>;
@@ -90,9 +93,13 @@ export class App {
   constructor() {
     this.container = document.getElementById('app')!;
     this.canvas = document.querySelector<HTMLCanvasElement>('#gameCanvas')!;
+    this.starCanvas = document.querySelector<HTMLCanvasElement>('#starCanvas')!;
 
     // Initialize audio
     this.audioManager = getAudioManager();
+
+    // Initialize star background renderer
+    this.starRenderer = new StarRenderer(this.starCanvas);
 
     // Initialize renderer
     this.renderer = new BoardRenderer(this.canvas, { animator });
@@ -432,6 +439,7 @@ export class App {
 
   private setupEventListeners(): void {
     window.addEventListener('resize', () => {
+      this.starRenderer.resize();
       this.renderer.resize();
       this.render();
     });
@@ -588,10 +596,16 @@ export class App {
 
   private showGameView(): void {
     this.hideAll();
+    // Show and start star background
+    this.starRenderer.show();
+    this.starRenderer.start();
     this.gameUI.show();
   }
 
   private hideAll(): void {
+    // Hide and stop star background when leaving game view
+    this.starRenderer.hide();
+    this.starRenderer.stop();
     this.topBar.hide();
     this.lobbyUI.hide();
     this.dashboardUI.hide();
