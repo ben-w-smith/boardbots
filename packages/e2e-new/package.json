@@ -1,0 +1,23 @@
+{
+  "name": "@lockitdown/e2e-new",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "build": ":",
+    "test": "playwright test",
+    "test:critical": "playwright test --project=critical",
+    "test:smoke": "playwright test --project=smoke",
+    "test:regression": "playwright test --project=regression",
+    "test:ci": "playwright test --project=critical --project=smoke",
+    "test:feature": "playwright test --grep",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "test:debug": "playwright test --debug",
+    "test:trace": "playwright test --trace on"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.50.0",
+    "@types/node": "^25.3.5"
+  }
+}
